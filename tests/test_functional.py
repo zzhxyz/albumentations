@@ -20,7 +20,7 @@ def test_vflip(target):
         [[0, 0, 1],
          [0, 1, 1],
          [1, 1, 1]], dtype=np.uint8)
-    img, expected = convert_2d_to_target_format([img, expected], target=target)
+    img, expected = convert_2d_to_target_format(img, expected, target=target)
     flipped_img = F.vflip(img)
     assert np.array_equal(flipped_img, expected)
 
@@ -35,7 +35,7 @@ def test_vflip_float(target):
         [[0.0, 0.0, 0.4],
          [0.0, 0.4, 0.4],
          [0.4, 0.4, 0.4]], dtype=np.float32)
-    img, expected = convert_2d_to_target_format([img, expected], target=target)
+    img, expected = convert_2d_to_target_format(img, expected, target=target)
     flipped_img = F.vflip(img)
     assert_array_almost_equal_nulp(flipped_img, expected)
 
@@ -50,7 +50,7 @@ def test_hflip(target):
         [[1, 1, 1],
          [1, 1, 0],
          [1, 0, 0]], dtype=np.uint8)
-    img, expected = convert_2d_to_target_format([img, expected], target=target)
+    img, expected = convert_2d_to_target_format(img, expected, target=target)
     flipped_img = F.hflip(img)
     assert np.array_equal(flipped_img, expected)
 
@@ -65,7 +65,7 @@ def test_hflip_float(target):
         [[0.4, 0.4, 0.4],
          [0.4, 0.4, 0.0],
          [0.4, 0.0, 0.0]], dtype=np.float32)
-    img, expected = convert_2d_to_target_format([img, expected], target=target)
+    img, expected = convert_2d_to_target_format(img, expected, target=target)
     flipped_img = F.hflip(img)
     assert_array_almost_equal_nulp(flipped_img, expected)
 
@@ -81,7 +81,7 @@ def test_random_flip(code, func, target):
         [[1, 1, 1],
          [0, 1, 1],
          [0, 0, 1]], dtype=np.uint8)
-    img = convert_2d_to_target_format([img], target=target)
+    img = convert_2d_to_target_format(img, target=target)
     assert np.array_equal(F.random_flip(img, code), func(img))
 
 
@@ -96,7 +96,7 @@ def test_random_flip_float(code, func, target):
         [[0.4, 0.4, 0.4],
          [0.0, 0.4, 0.4],
          [0.0, 0.0, 0.4]], dtype=np.float32)
-    img = convert_2d_to_target_format([img], target=target)
+    img = convert_2d_to_target_format(img, target=target)
     assert_array_almost_equal_nulp(F.random_flip(img, code), func(img))
 
 
@@ -130,7 +130,7 @@ def test_rot90(target):
         [[1, 1, 1],
          [0, 0, 0],
          [0, 0, 0]], dtype=np.uint8)
-    img, expected = convert_2d_to_target_format([img, expected], target=target)
+    img, expected = convert_2d_to_target_format(img, expected, target=target)
     rotated = F.rot90(img, factor=1)
     assert np.array_equal(rotated, expected)
 
@@ -145,7 +145,7 @@ def test_rot90_float(target):
         [[0.4, 0.4, 0.4],
          [0.0, 0.0, 0.0],
          [0.0, 0.0, 0.0]], dtype=np.float32)
-    img, expected = convert_2d_to_target_format([img, expected], target=target)
+    img, expected = convert_2d_to_target_format(img, expected, target=target)
     rotated = F.rot90(img, factor=1)
     assert_array_almost_equal_nulp(rotated, expected)
 
@@ -186,7 +186,7 @@ def test_center_crop(target):
     expected = np.array(
         [[1, 1],
          [0, 1]], dtype=np.uint8)
-    img, expected = convert_2d_to_target_format([img, expected], target=target)
+    img, expected = convert_2d_to_target_format(img, expected, target=target)
     cropped_img = F.center_crop(img, 2, 2)
     assert np.array_equal(cropped_img, expected)
 
@@ -201,7 +201,7 @@ def test_center_crop_float(target):
     expected = np.array(
         [[0.4, 0.4],
          [0.0, 0.4]], dtype=np.float32)
-    img, expected = convert_2d_to_target_format([img, expected], target=target)
+    img, expected = convert_2d_to_target_format(img, expected, target=target)
     cropped_img = F.center_crop(img, 2, 2)
     assert_array_almost_equal_nulp(cropped_img, expected)
 
@@ -223,7 +223,7 @@ def test_random_crop(target):
     expected = np.array(
         [[5, 6],
          [9, 10]], dtype=np.uint8)
-    img, expected = convert_2d_to_target_format([img, expected], target=target)
+    img, expected = convert_2d_to_target_format(img, expected, target=target)
     cropped_img = F.random_crop(img, crop_height=2, crop_width=2, h_start=0.5, w_start=0)
     assert np.array_equal(cropped_img, expected)
 
@@ -238,7 +238,7 @@ def test_random_crop_float(target):
     expected = np.array(
         [[0.05, 0.06],
          [0.09, 0.10]], dtype=np.float32)
-    img, expected = convert_2d_to_target_format([img, expected], target=target)
+    img, expected = convert_2d_to_target_format(img, expected, target=target)
     cropped_img = F.random_crop(img, crop_height=2, crop_width=2, h_start=0.5, w_start=0)
     assert_array_almost_equal_nulp(cropped_img, expected)
 
@@ -282,7 +282,7 @@ def test_pad(target):
          [2, 1, 2, 1],
          [4, 3, 4, 3],
          [2, 1, 2, 1]], dtype=np.uint8)
-    img, expected = convert_2d_to_target_format([img, expected], target=target)
+    img, expected = convert_2d_to_target_format(img, expected, target=target)
     padded = F.pad(img, min_height=4, min_width=4)
     assert np.array_equal(padded, expected)
 
@@ -297,7 +297,7 @@ def test_pad_float(target):
          [0.2, 0.1, 0.2, 0.1],
          [0.4, 0.3, 0.4, 0.3],
          [0.2, 0.1, 0.2, 0.1]], dtype=np.float32)
-    img, expected = convert_2d_to_target_format([img, expected], target=target)
+    img, expected = convert_2d_to_target_format(img, expected, target=target)
     padded_img = F.pad(img, min_height=4, min_width=4)
     assert_array_almost_equal_nulp(padded_img, expected)
 
@@ -314,7 +314,7 @@ def test_rotate_from_shift_scale_rotate(target):
         [4, 8, 12, 16],
         [3, 7, 11, 15],
         [2, 6, 10, 14]], dtype=np.uint8)
-    img, expected = convert_2d_to_target_format([img, expected], target=target)
+    img, expected = convert_2d_to_target_format(img, expected, target=target)
     rotated_img = F.shift_scale_rotate(img, angle=90, scale=1, dx=0, dy=0, interpolation=cv2.INTER_NEAREST,
                                        border_mode=cv2.BORDER_CONSTANT)
     assert np.array_equal(rotated_img, expected)
@@ -332,7 +332,7 @@ def test_rotate_float_from_shift_scale_rotate(target):
         [0.04, 0.08, 0.12, 0.16],
         [0.03, 0.07, 0.11, 0.15],
         [0.02, 0.06, 0.10, 0.14]], dtype=np.float32)
-    img, expected = convert_2d_to_target_format([img, expected], target=target)
+    img, expected = convert_2d_to_target_format(img, expected, target=target)
     rotated_img = F.shift_scale_rotate(img, angle=90, scale=1, dx=0, dy=0, interpolation=cv2.INTER_NEAREST,
                                        border_mode=cv2.BORDER_CONSTANT)
     assert_array_almost_equal_nulp(rotated_img, expected)
@@ -350,7 +350,7 @@ def test_scale_from_shift_scale_rotate(target):
         [10, 11, 11, 12],
         [10, 11, 11, 12],
         [14, 15, 15, 16]], dtype=np.uint8)
-    img, expected = convert_2d_to_target_format([img, expected], target=target)
+    img, expected = convert_2d_to_target_format(img, expected, target=target)
     scaled_img = F.shift_scale_rotate(img, angle=0, scale=2, dx=0, dy=0, interpolation=cv2.INTER_NEAREST,
                                       border_mode=cv2.BORDER_CONSTANT)
     assert np.array_equal(scaled_img, expected)
@@ -368,7 +368,7 @@ def test_scale_float_from_shift_scale_rotate(target):
         [0.10, 0.11, 0.11, 0.12],
         [0.10, 0.11, 0.11, 0.12],
         [0.14, 0.15, 0.15, 0.16]], dtype=np.float32)
-    img, expected = convert_2d_to_target_format([img, expected], target=target)
+    img, expected = convert_2d_to_target_format(img, expected, target=target)
     scaled_img = F.shift_scale_rotate(img, angle=0, scale=2, dx=0, dy=0, interpolation=cv2.INTER_NEAREST,
                                       border_mode=cv2.BORDER_CONSTANT)
     assert_array_almost_equal_nulp(scaled_img, expected)
@@ -386,7 +386,7 @@ def test_shift_x_from_shift_scale_rotate(target):
         [0, 0, 5, 6],
         [0, 0, 9, 10],
         [0, 0, 13, 14]], dtype=np.uint8)
-    img, expected = convert_2d_to_target_format([img, expected], target=target)
+    img, expected = convert_2d_to_target_format(img, expected, target=target)
     shifted_along_x_img = F.shift_scale_rotate(img, angle=0, scale=1, dx=0.5, dy=0, interpolation=cv2.INTER_NEAREST,
                                                border_mode=cv2.BORDER_CONSTANT)
     assert np.array_equal(shifted_along_x_img, expected)
@@ -404,7 +404,7 @@ def test_shift_x_float_from_shift_scale_rotate(target):
         [0.00, 0.00, 0.05, 0.06],
         [0.00, 0.00, 0.09, 0.10],
         [0.00, 0.00, 0.13, 0.14]], dtype=np.float32)
-    img, expected = convert_2d_to_target_format([img, expected], target=target)
+    img, expected = convert_2d_to_target_format(img, expected, target=target)
     shifted_along_x_img = F.shift_scale_rotate(img, angle=0, scale=1, dx=0.5, dy=0, interpolation=cv2.INTER_NEAREST,
                                                border_mode=cv2.BORDER_CONSTANT)
     assert_array_almost_equal_nulp(shifted_along_x_img, expected)
@@ -422,7 +422,7 @@ def test_shift_y_from_shift_scale_rotate(target):
         [0, 0, 0, 0],
         [1, 2, 3, 4],
         [5, 6, 7, 8]], dtype=np.uint8)
-    img, expected = convert_2d_to_target_format([img, expected], target=target)
+    img, expected = convert_2d_to_target_format(img, expected, target=target)
     shifted_along_y_img = F.shift_scale_rotate(img, angle=0, scale=1, dx=0, dy=0.5, interpolation=cv2.INTER_NEAREST,
                                                border_mode=cv2.BORDER_CONSTANT)
     assert np.array_equal(shifted_along_y_img, expected)
@@ -440,7 +440,7 @@ def test_shift_y_float_from_shift_scale_rotate(target):
         [0.00, 0.00, 0.00, 0.00],
         [0.01, 0.02, 0.03, 0.04],
         [0.05, 0.06, 0.07, 0.08]], dtype=np.float32)
-    img, expected = convert_2d_to_target_format([img, expected], target=target)
+    img, expected = convert_2d_to_target_format(img, expected, target=target)
     shifted_along_y_img = F.shift_scale_rotate(img, angle=0, scale=1, dx=0, dy=0.5, interpolation=cv2.INTER_NEAREST,
                                                border_mode=cv2.BORDER_CONSTANT)
     assert_array_almost_equal_nulp(shifted_along_y_img, expected)
@@ -589,7 +589,7 @@ def test_scale(target):
                          [9, 9, 10, 10, 11, 11],
                          [10, 10, 11, 11, 12, 12]], dtype=np.uint8)
 
-    img, expected = convert_2d_to_target_format([img, expected], target=target)
+    img, expected = convert_2d_to_target_format(img, expected, target=target)
     scaled = F.scale(img, scale=2, interpolation=cv2.INTER_LINEAR)
     assert np.array_equal(scaled, expected)
 
@@ -605,7 +605,7 @@ def test_longest_max_size(target):
                          [6, 7],
                          [10, 11]], dtype=np.uint8)
 
-    img, expected = convert_2d_to_target_format([img, expected], target=target)
+    img, expected = convert_2d_to_target_format(img, expected, target=target)
     scaled = F.longest_max_size(img, max_size=3, interpolation=cv2.INTER_LINEAR)
     assert np.array_equal(scaled, expected)
 
@@ -622,7 +622,7 @@ def test_smallest_max_size(target):
         [10, 11, 13, 14],
         [17, 19, 20, 22]], dtype=np.uint8)
 
-    img, expected = convert_2d_to_target_format([img, expected], target=target)
+    img, expected = convert_2d_to_target_format(img, expected, target=target)
     scaled = F.smallest_max_size(img, max_size=3, interpolation=cv2.INTER_LINEAR)
     assert np.array_equal(scaled, expected)
 
@@ -649,7 +649,7 @@ def test_resize_default_interpolation(target):
         [2, 2],
         [4, 4],
     ], dtype=np.uint8)
-    img, expected = convert_2d_to_target_format([img, expected], target=target)
+    img, expected = convert_2d_to_target_format(img, expected, target=target)
     resized_img = F.resize(img, 2, 2)
     height, width = resized_img.shape[:2]
     assert height == 2
@@ -669,7 +669,7 @@ def test_resize_nearest_interpolation(target):
         [1, 1],
         [3, 3],
     ], dtype=np.uint8)
-    img, expected = convert_2d_to_target_format([img, expected], target=target)
+    img, expected = convert_2d_to_target_format(img, expected, target=target)
     resized_img = F.resize(img, 2, 2, interpolation=cv2.INTER_NEAREST)
     height, width = resized_img.shape[:2]
     assert height == 2
@@ -680,7 +680,7 @@ def test_resize_nearest_interpolation(target):
 @pytest.mark.parametrize('target', ['image', 'mask'])
 def test_resize_different_height_and_width(target):
     img = np.ones((100, 100), dtype=np.uint8)
-    img = convert_2d_to_target_format([img], target=target)
+    img = convert_2d_to_target_format(img, target=target)
     resized_img = F.resize(img, height=20, width=30)
     height, width = resized_img.shape[:2]
     assert height == 20
@@ -702,7 +702,7 @@ def test_resize_default_interpolation_float(target):
         [0.15, 0.15],
         [0.35, 0.35],
     ], dtype=np.float32)
-    img, expected = convert_2d_to_target_format([img, expected], target=target)
+    img, expected = convert_2d_to_target_format(img, expected, target=target)
     resized_img = F.resize(img, 2, 2)
     height, width = resized_img.shape[:2]
     assert height == 2
@@ -722,7 +722,7 @@ def test_resize_nearest_interpolation_float(target):
         [0.1, 0.1],
         [0.3, 0.3],
     ], dtype=np.float32)
-    img, expected = convert_2d_to_target_format([img, expected], target=target)
+    img, expected = convert_2d_to_target_format(img, expected, target=target)
     resized_img = F.resize(img, 2, 2, interpolation=cv2.INTER_NEAREST)
     height, width = resized_img.shape[:2]
     assert height == 2

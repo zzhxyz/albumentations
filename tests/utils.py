@@ -10,7 +10,7 @@ def convert_2d_to_3d(arrays, num_channels=3):
     return arrays
 
 
-def convert_2d_to_target_format(arrays, target):
+def convert_2d_to_target_format(*arrays, target):
     if target == 'mask':
         return arrays[0] if len(arrays) == 1 else arrays
     elif target == 'image':
