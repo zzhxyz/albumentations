@@ -33,14 +33,14 @@ matrix:
 #      python: 3.7
     - os: windows
       language: sh
-      python: '3.7'
+      python: '3.6'
       before_install:
         - choco install python3
-        - export PATH="/c/Python37:/c/Python37/Scripts:$PATH"
+        - export PATH="/c/Python36:/c/Python36/Scripts:$PATH"
         - python -m pip install --upgrade pip wheel
 
 install:
-  - pip install https://download.lfd.uci.edu/pythonlibs/r5uhg2lo/Shapely-1.6.4.post1-cp37-cp37m-win_amd64.whl
+  - pip install https://download.lfd.uci.edu/pythonlibs/r5uhg2lo/Shapely-1.6.4.post1-cp36-cp36m-win_amd64.whl
   - pip install .[tests]
   - pip install flake8 flake8-docstrings
 
