@@ -7,6 +7,7 @@ import numpy as np
 
 from albumentations.augmentations.keypoints_utils import convert_keypoints_from_albumentations, filter_keypoints, \
     convert_keypoints_to_albumentations, check_keypoints
+from albumentations.core.schedule import Schedule
 from albumentations.core.transforms_interface import DualTransform
 from albumentations.imgaug.transforms import DualIAATransform
 from albumentations.augmentations.bbox_utils import convert_bboxes_from_albumentations, \
@@ -56,6 +57,13 @@ class BaseCompose(object):
 
     def __getitem__(self, item):
         return self.transforms[item]
+
+    def step(self, current_step=None):
+        if isinstance(self.p, Schedule):
+            self.p.step(current_step)
+
+        for t in self.transforms:
+            t.step(current_step)
 
     def add_targets(self, additional_targets):
         if additional_targets:
@@ -138,7 +146,7 @@ class Compose(BaseCompose):
         self.add_targets(additional_targets)
 
     def __call__(self, **data):
-        need_to_run = random.random() < self.p
+        need_to_run = random.random() < float(self.p)
         transforms = self.transforms if need_to_run else find_always_apply_transforms(self.transforms)
         dual_start_end = None
         if self.params[self.bboxes_name] or self.params[self.keypoints_name]:
@@ -252,8 +260,16 @@ class OneOf(BaseCompose):
         s = sum(transforms_ps)
         self.transforms_ps = [t / s for t in transforms_ps]
 
+    def step(self, current_step=None):
+        for t in self.transforms:
+            t.step(current_step)
+
+        transforms_ps = [float(t.p) for t in self.transforms]
+        s = sum(transforms_ps)
+        self.transforms_ps = [t / s for t in transforms_ps]
+
     def __call__(self, **data):
-        if random.random() < self.p:
+        if random.random() < float(self.p):
             random_state = np.random.RandomState(random.randint(0, 2 ** 32 - 1))
             t = random_state.choice(self.transforms, p=self.transforms_ps)
             t.p = 1.
@@ -268,4 +284,4 @@ class OneOrOther(BaseCompose):
             t.p = 1.
 
     def __call__(self, **data):
-        return self.transforms[0](**data) if random.random() < self.p else self.transforms[-1](**data)
+        return self.transforms[0](**data) if random.random() < float(self.p) else self.transforms[-1](**data)

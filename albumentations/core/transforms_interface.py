@@ -18,12 +18,18 @@ def to_tuple(param, low=None):
 
 class BasicTransform(object):
     def __init__(self, always_apply=False, p=0.5):
+        """
+
+        Args:
+            always_apply:
+            p: Either scalar or instance of Schedule
+        """
         self.p = p
         self.always_apply = always_apply
         self._additional_targets = {}
 
     def __call__(self, **kwargs):
-        if (random.random() < self.p) or self.always_apply:
+        if (random.random() < float(self.p)) or self.always_apply:
             params = self.get_params()
             params = self.update_params(params, **kwargs)
             if self.targets_as_params:
