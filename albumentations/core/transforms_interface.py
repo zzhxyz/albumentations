@@ -2,6 +2,8 @@ import random
 
 import cv2
 
+from .schedule import Schedule
+
 __all__ = ['to_tuple', 'BasicTransform', 'DualTransform', 'ImageOnlyTransform', 'NoOp']
 
 
@@ -96,6 +98,13 @@ class BasicTransform(object):
     def get_params_dependent_on_targets(self, params):
         raise NotImplementedError
 
+    def reset(self):
+        if isinstance(self.p, Schedule):
+            self.p.reset()
+
+    def step(self, current_step=None):
+        if isinstance(self.p, Schedule):
+            self.p.step(current_step)
 
 class DualTransform(BasicTransform):
     """Transform for segmentation task."""

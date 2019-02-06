@@ -32,7 +32,7 @@ class Schedule(object):
         return self.steps
 
     def __float__(self):
-        return self.value()
+        return float(self.value())
 
 
 class ConcatSchedule(Schedule):
@@ -124,7 +124,7 @@ class CosineRestartsDecay(Schedule):
 
 if __name__ == '__main__':
     import matplotlib.pyplot as plt
-
+    import cv2
 
     def get_values(sched, steps=None):
         values = []
@@ -156,3 +156,14 @@ if __name__ == '__main__':
     plt.plot(get_values(concat, 300), label='Concat')
 
     plt.show()
+
+    aug = A.Compose([
+
+    ], p=concat)
+
+    cv2.imread('test.jpg')
+
+    aug.reset()
+    for epoch in range(300):
+        aug.step()
+        aug(image=image)

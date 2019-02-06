@@ -58,6 +58,13 @@ class BaseCompose(object):
     def __getitem__(self, item):
         return self.transforms[item]
 
+    def reset(self):
+        if isinstance(self.p, Schedule):
+            self.p.reset()
+
+        for t in self.transforms:
+            t.reset()
+
     def step(self, current_step=None):
         if isinstance(self.p, Schedule):
             self.p.step(current_step)
