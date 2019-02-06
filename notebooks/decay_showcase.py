@@ -19,9 +19,9 @@ def main():
 
         return values
 
-    lin = A.LinearSchedule(0, 2, a_min=0, a_max=50, steps=100)
-    cos = A.CosineRestartsDecay(50, 20, a_min=1, steps=100)
-    exp = A.ExpDecay(50, 0.01, a_min=1, steps=100)
+    lin = A.LinearSchedule(0, 0.01, a_min=0, a_max=1, steps=100)
+    cos = A.CosineRestartsDecay(1, 20, a_min=0, a_max=1.0, steps=100)
+    exp = A.ExpDecay(1, 0.95, a_min=0, steps=100)
 
     plt.figure()
     plt.plot(get_values(lin), label='Linear')

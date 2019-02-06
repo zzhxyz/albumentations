@@ -94,7 +94,7 @@ class ExpDecay(Schedule):
     def step(self, current_step=None):
         super(ExpDecay, self).step(current_step)
 
-        new_val = self.initial_value ** math.exp(- self.current_step * self.decay)
+        new_val = self.initial_value * math.pow(self.decay, self.current_step)
         self.current_value = np.clip(new_val, a_min=self.min, a_max=self.max)
 
     def reset(self):
