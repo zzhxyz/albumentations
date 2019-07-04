@@ -286,22 +286,30 @@ class OneOf(BaseCompose):
         self.transforms_ps = [t / s for t in transforms_ps]
 
     def __call__(self, force_apply=False, **data):
-        if force_apply or random.random() < self.p:
+        if force_apply or random.random() < float(self.p):
             random_state = np.random.RandomState(random.randint(0, 2 ** 32 - 1))
             t = random_state.choice(self.transforms, p=self.transforms_ps)
             data = t(force_apply=True, **data)
         return data
 
+    def step(self, current_step=None):
+        for t in self.transforms:
+            t.step(current_step)
+
+        transforms_ps = [float(t.p) for t in self.transforms]
+        s = sum(transforms_ps)
+        self.transforms_ps = [t / s for t in transforms_ps]
+
 
 class OneOrOther(BaseCompose):
-
     def __init__(self, first=None, second=None, transforms=None, p=0.5):
         if transforms is None:
             transforms = [first, second]
+        assert len(transforms) == 2
         super(OneOrOther, self).__init__(transforms, p)
 
     def __call__(self, force_apply=False, **data):
-        if random.random() < self.p:
+        if random.random() < float(self.p):
             return self.transforms[0](force_apply=True, **data)
         else:
             return self.transforms[-1](force_apply=True, **data)

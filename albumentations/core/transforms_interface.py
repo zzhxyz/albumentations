@@ -50,7 +50,7 @@ class BasicTransform(object):
         self._additional_targets = {}
 
     def __call__(self, force_apply=False, **kwargs):
-        if (random.random() < self.p) or self.always_apply or force_apply:
+        if (random.random() < float(self.p)) or self.always_apply or force_apply:
             params = self.get_params()
             params = self.update_params(params, **kwargs)
             if self.targets_as_params:
@@ -156,6 +156,13 @@ class BasicTransform(object):
         state.update(self.get_transform_init_args())
         return state
 
+    def reset(self):
+        if isinstance(self.p, Schedule):
+            self.p.reset()
+
+    def step(self, current_step=None):
+        if isinstance(self.p, Schedule):
+            self.p.step(current_step)
 
 class DualTransform(BasicTransform):
     """Transform for segmentation task."""
