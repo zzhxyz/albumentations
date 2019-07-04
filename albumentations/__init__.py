@@ -1,10 +1,11 @@
 from __future__ import absolute_import
 
-__version__ = '0.1.12'
+__version__ = '0.3.0'
 
 from .core.composition import *
 from .core.schedule import *
 from .core.transforms_interface import *
+from .core.serialization import *
 from .augmentations.transforms import *
 from .augmentations.bbox_utils import *
 from .imgaug.transforms import *

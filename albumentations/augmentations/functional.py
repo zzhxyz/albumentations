@@ -2,7 +2,6 @@ from __future__ import division
 
 import math
 from functools import wraps
-import random
 from warnings import warn
 
 import cv2
@@ -34,7 +33,10 @@ def clipped(func):
 
 
 def preserve_shape(func):
-    """Preserve shape of the image."""
+    """
+    Preserve shape of the image
+
+    """
     @wraps(func)
     def wrapped_function(img, *args, **kwargs):
         shape = img.shape
@@ -46,7 +48,10 @@ def preserve_shape(func):
 
 
 def preserve_channel_dim(func):
-    """Preserve dummy channel dim."""
+    """
+    Preserve dummy channel dim.
+
+    """
     @wraps(func)
     def wrapped_function(img, *args, **kwargs):
         shape = img.shape
@@ -58,12 +63,39 @@ def preserve_channel_dim(func):
     return wrapped_function
 
 
+def is_rgb_image(image):
+    return len(image.shape) == 3 and image.shape[-1] == 3
+
+
+def is_grayscale_image(image):
+    return (len(image.shape) == 2) or (len(image.shape) == 3 and image.shape[-1] == 1)
+
+
+def is_multispectral_image(image):
+    return len(image.shape) == 3 and image.shape[-1] not in [1, 3]
+
+
+def non_rgb_warning(image):
+    if not is_rgb_image(image):
+        message = 'This transformation expects 3-channel images'
+        if is_grayscale_image(image):
+            message += '\nYou can convert your grayscale image to RGB using cv2.cvtColor(image, cv2.COLOR_GRAY2RGB))'
+        if is_multispectral_image(image):  # Any image with a number of channels other than 1 and 3
+            message += '\nThis transformation cannot be applied to multi-spectral images'
+
+        raise ValueError(message)
+
+
 def vflip(img):
     return np.ascontiguousarray(img[::-1, ...])
 
 
 def hflip(img):
     return np.ascontiguousarray(img[:, ::-1, ...])
+
+
+def hflip_cv2(img):
+    return cv2.flip(img, 1)
 
 
 @preserve_shape
@@ -95,29 +127,19 @@ def normalize(img, mean, std, max_pixel_value=255.0):
     return img
 
 
-def cutout(img, num_holes, max_h_size, max_w_size):
+def cutout(img, holes, fill_value=0):
     # Make a copy of the input image since we don't want to modify it directly
     img = img.copy()
-    height, width = img.shape[:2]
-
-    for n in range(num_holes):
-        y = random.randint(0, height)
-        x = random.randint(0, width)
-
-        y1 = np.clip(y - max_h_size // 2, 0, height)
-        y2 = np.clip(y + max_h_size // 2, 0, height)
-        x1 = np.clip(x - max_w_size // 2, 0, width)
-        x2 = np.clip(x + max_w_size // 2, 0, width)
-
-        img[y1: y2, x1: x2] = 0
+    for x1, y1, x2, y2 in holes:
+        img[y1: y2, x1: x2] = fill_value
     return img
 
 
 @preserve_channel_dim
-def rotate(img, angle, interpolation=cv2.INTER_LINEAR, border_mode=cv2.BORDER_REFLECT_101):
+def rotate(img, angle, interpolation=cv2.INTER_LINEAR, border_mode=cv2.BORDER_REFLECT_101, value=None):
     height, width = img.shape[:2]
     matrix = cv2.getRotationMatrix2D((width / 2, height / 2), angle, 1.0)
-    img = cv2.warpAffine(img, matrix, (width, height), flags=interpolation, borderMode=border_mode)
+    img = cv2.warpAffine(img, matrix, (width, height), flags=interpolation, borderMode=border_mode, borderValue=value)
     return img
 
 
@@ -136,14 +158,44 @@ def resize(img, height, width, interpolation=cv2.INTER_LINEAR):
 
 
 @preserve_channel_dim
-def shift_scale_rotate(img, angle, scale, dx, dy, interpolation=cv2.INTER_LINEAR, border_mode=cv2.BORDER_REFLECT_101):
+def shift_scale_rotate(img, angle, scale, dx, dy, interpolation=cv2.INTER_LINEAR, border_mode=cv2.BORDER_REFLECT_101,
+                       value=None):
     height, width = img.shape[:2]
     center = (width / 2, height / 2)
     matrix = cv2.getRotationMatrix2D(center, angle, scale)
     matrix[0, 2] += dx * width
     matrix[1, 2] += dy * height
-    img = cv2.warpAffine(img, matrix, (width, height), flags=interpolation, borderMode=border_mode)
+    img = cv2.warpAffine(img, matrix, (width, height), flags=interpolation, borderMode=border_mode, borderValue=value)
     return img
+
+
+def bbox_shift_scale_rotate(bbox, angle, scale, dx, dy, interpolation, rows, cols, **params):
+    height, width = rows, cols
+    center = (width / 2, height / 2)
+    matrix = cv2.getRotationMatrix2D(center, angle, scale)
+    matrix[0, 2] += dx * width
+    matrix[1, 2] += dy * height
+    x = np.array([bbox[0], bbox[2], bbox[2], bbox[0]])
+    y = np.array([bbox[1], bbox[1], bbox[3], bbox[3]])
+    ones = np.ones(shape=(len(x)))
+    points_ones = np.vstack([x, y, ones]).transpose()
+    points_ones[:, 0] *= width
+    points_ones[:, 1] *= height
+    tr_points = matrix.dot(points_ones.T).T
+    tr_points[:, 0] /= width
+    tr_points[:, 1] /= height
+    return [min(tr_points[:, 0]), min(tr_points[:, 1]), max(tr_points[:, 0]), max(tr_points[:, 1])]
+
+
+def keypoint_shift_scale_rotate(keypoint, angle, scale, dx, dy, rows, cols, **params):
+    height, width = rows, cols
+    center = (width / 2, height / 2)
+    x, y, a, s = keypoint
+    matrix = cv2.getRotationMatrix2D(center, angle, scale)
+    matrix[0, 2] += dx * width
+    matrix[1, 2] += dy * height
+    x, y = cv2.transform(np.array([[[x, y]]]), matrix).squeeze()
+    return [x, y, a + math.radians(angle), s * scale]
 
 
 def crop(img, x_min, y_min, x_max, y_max):
@@ -273,15 +325,21 @@ def shift_rgb(img, r_shift, g_shift, b_shift):
 def clahe(img, clip_limit=2.0, tile_grid_size=(8, 8)):
     if img.dtype != np.uint8:
         raise TypeError('clahe supports only uint8 inputs')
-    img = cv2.cvtColor(img, cv2.COLOR_RGB2LAB)
+
     clahe = cv2.createCLAHE(clipLimit=clip_limit, tileGridSize=tile_grid_size)
-    img[:, :, 0] = clahe.apply(img[:, :, 0])
-    img = cv2.cvtColor(img, cv2.COLOR_LAB2RGB)
+
+    if len(img.shape) == 2:
+        img = clahe.apply(img)
+    else:
+        img = cv2.cvtColor(img, cv2.COLOR_RGB2LAB)
+        img[:, :, 0] = clahe.apply(img[:, :, 0])
+        img = cv2.cvtColor(img, cv2.COLOR_LAB2RGB)
+
     return img
 
 
 @preserve_channel_dim
-def pad(img, min_height, min_width, border_mode=cv2.BORDER_REFLECT_101, value=[0, 0, 0]):
+def pad(img, min_height, min_width, border_mode=cv2.BORDER_REFLECT_101, value=None):
     height, width = img.shape[:2]
 
     if height < min_height:
@@ -308,7 +366,7 @@ def pad(img, min_height, min_width, border_mode=cv2.BORDER_REFLECT_101, value=[0
 
 @preserve_channel_dim
 def pad_with_params(img, h_pad_top, h_pad_bottom, w_pad_left, w_pad_right, border_mode=cv2.BORDER_REFLECT_101,
-                    value=[0, 0, 0]):
+                    value=None):
     img = cv2.copyMakeBorder(img, h_pad_top, h_pad_bottom, w_pad_left, w_pad_right, border_mode, value=value)
     return img
 
@@ -318,13 +376,19 @@ def blur(img, ksize):
     return cv2.blur(img, (ksize, ksize))
 
 
+@preserve_shape
+def gaussian_blur(img, ksize):
+    # When sigma=0, it is computed as `sigma = 0.3*((ksize-1)*0.5 - 1) + 0.8`
+    return cv2.GaussianBlur(img, (ksize, ksize), sigmaX=0)
+
+
 def _func_max_size(img, max_size, interpolation, func):
     height, width = img.shape[:2]
 
     scale = max_size / float(func(width, height))
 
     if scale != 1.0:
-        out_size = tuple(int(dim * scale) for dim in (width, height))
+        out_size = tuple(py3round(dim * scale) for dim in (width, height))
         img = cv2.resize(img, out_size, interpolation=interpolation)
     return img
 
@@ -348,15 +412,7 @@ def median_blur(img, ksize):
 
 
 @preserve_shape
-def motion_blur(img, ksize):
-    assert ksize > 2
-    kernel = np.zeros((ksize, ksize), dtype=np.uint8)
-    xs, xe = random.randint(0, ksize - 1), random.randint(0, ksize - 1)
-    if xs == xe:
-        ys, ye = random.sample(range(ksize), 2)
-    else:
-        ys, ye = random.randint(0, ksize - 1), random.randint(0, ksize - 1)
-    cv2.line(kernel, (xs, ys), (xe, ye), 1, thickness=1)
+def motion_blur(img, kernel):
     return cv2.filter2D(img, -1, kernel / np.sum(kernel))
 
 
@@ -384,7 +440,249 @@ def jpeg_compression(img, quality):
 
 
 @preserve_shape
-def optical_distortion(img, k=0, dx=0, dy=0, interpolation=cv2.INTER_LINEAR, border_mode=cv2.BORDER_REFLECT_101):
+def add_snow(img, snow_point, brightness_coeff):
+    """Bleaches out pixels, mitation snow.
+
+    From https://github.com/UjjwalSaxena/Automold--Road-Augmentation-Library
+
+    Args:
+        img:
+        snow_point:
+        brightness_coeff:
+
+    Returns:
+
+    """
+    non_rgb_warning(img)
+
+    input_dtype = img.dtype
+    needs_float = False
+
+    snow_point *= 127.5  # = 255 / 2
+    snow_point += 85  # = 255 / 3
+
+    if input_dtype == np.float32:
+        img = from_float(img, dtype=np.dtype('uint8'))
+        needs_float = True
+    elif input_dtype not in (np.uint8, np.float32):
+        raise ValueError('Unexpected dtype {} for RandomSnow augmentation'.format(input_dtype))
+
+    image_HLS = cv2.cvtColor(img, cv2.COLOR_RGB2HLS)
+    image_HLS = np.array(image_HLS, dtype=np.float32)
+
+    image_HLS[:, :, 1][image_HLS[:, :, 1] < snow_point] *= brightness_coeff
+
+    image_HLS[:, :, 1] = clip(image_HLS[:, :, 1], np.uint8, 255)
+
+    image_HLS = np.array(image_HLS, dtype=np.uint8)
+
+    image_RGB = cv2.cvtColor(image_HLS, cv2.COLOR_HLS2RGB)
+
+    if needs_float:
+        image_RGB = to_float(image_RGB, max_value=255)
+
+    return image_RGB
+
+
+@preserve_shape
+def add_rain(img, slant, drop_length, drop_width, drop_color, blur_value, brightness_coefficient, rain_drops):
+    """
+
+    From https://github.com/UjjwalSaxena/Automold--Road-Augmentation-Library
+
+    Args:
+        img (np.uint8):
+        slant (int):
+        drop_length:
+        drop_width:
+        drop_color:
+        blur_value (int): rainy view are blurry
+        brightness_coefficient (float): rainy days are usually shady
+        rain_drops:
+
+    Returns:
+
+    """
+    non_rgb_warning(img)
+
+    input_dtype = img.dtype
+    needs_float = False
+
+    if input_dtype == np.float32:
+        img = from_float(img, dtype=np.dtype('uint8'))
+        needs_float = True
+    elif input_dtype not in (np.uint8, np.float32):
+        raise ValueError('Unexpected dtype {} for RandomSnow augmentation'.format(input_dtype))
+
+    image = img.copy()
+
+    for (rain_drop_x0, rain_drop_y0) in rain_drops:
+        rain_drop_x1 = rain_drop_x0 + slant
+        rain_drop_y1 = rain_drop_y0 + drop_length
+
+        cv2.line(image, (rain_drop_x0, rain_drop_y0), (rain_drop_x1, rain_drop_y1), drop_color, drop_width)
+
+    image = cv2.blur(image, (blur_value, blur_value))  # rainy view are blurry
+    image_hls = cv2.cvtColor(image, cv2.COLOR_RGB2HLS).astype(np.float32)
+    image_hls[:, :, 1] *= brightness_coefficient
+
+    image_rgb = cv2.cvtColor(image_hls.astype(np.uint8), cv2.COLOR_HLS2RGB)
+
+    if needs_float:
+        image_rgb = to_float(image_rgb, max_value=255)
+
+    return image_rgb
+
+
+@preserve_shape
+def add_fog(img, fog_coef, alpha_coef, haze_list):
+    """Add fog to the image.
+
+    From https://github.com/UjjwalSaxena/Automold--Road-Augmentation-Library
+
+    Args:
+        img (np.array):
+        fog_coef (float):
+        alpha_coef (float):
+        haze_list (list):
+    Returns:
+
+    """
+    non_rgb_warning(img)
+
+    input_dtype = img.dtype
+    needs_float = False
+
+    if input_dtype == np.float32:
+        img = from_float(img, dtype=np.dtype('uint8'))
+        needs_float = True
+    elif input_dtype not in (np.uint8, np.float32):
+        raise ValueError('Unexpected dtype {} for RandomFog augmentation'.format(input_dtype))
+
+    height, width = img.shape[:2]
+
+    hw = max(int(width // 3 * fog_coef), 10)
+
+    for haze_points in haze_list:
+        x, y = haze_points
+        overlay = img.copy()
+        output = img.copy()
+        alpha = alpha_coef * fog_coef
+        rad = hw // 2
+        point = (x + hw // 2, y + hw // 2)
+        cv2.circle(overlay, point, int(rad), (255, 255, 255), -1)
+        cv2.addWeighted(overlay, alpha, output, 1 - alpha, 0, output)
+
+        img = output.copy()
+
+    image_rgb = cv2.blur(img, (hw // 10, hw // 10))
+
+    if needs_float:
+        image_rgb = to_float(image_rgb, max_value=255)
+
+    return image_rgb
+
+
+@preserve_shape
+def add_sun_flare(img, flare_center_x, flare_center_y, src_radius, src_color, circles):
+    """Add sun flare.
+
+    From https://github.com/UjjwalSaxena/Automold--Road-Augmentation-Library
+
+    Args:
+        img (np.array):
+        flare_center_x (float):
+        flare_center_y (float):
+        src_radius:
+        src_color (int, int, int):
+        circles (list):
+
+    Returns:
+
+    """
+    non_rgb_warning(img)
+
+    input_dtype = img.dtype
+    needs_float = False
+
+    if input_dtype == np.float32:
+        img = from_float(img, dtype=np.dtype('uint8'))
+        needs_float = True
+    elif input_dtype not in (np.uint8, np.float32):
+        raise ValueError('Unexpected dtype {} for RandomSunFlareaugmentation'.format(input_dtype))
+
+    overlay = img.copy()
+    output = img.copy()
+
+    for (alpha, (x, y), rad3, (r_color, g_color, b_color)) in circles:
+        cv2.circle(overlay, (x, y), rad3, (r_color, g_color, b_color), -1)
+
+        cv2.addWeighted(overlay, alpha, output, 1 - alpha, 0, output)
+
+    point = (int(flare_center_x), int(flare_center_y))
+
+    overlay = output.copy()
+    num_times = src_radius // 10
+    alpha = np.linspace(0.0, 1, num=num_times)
+    rad = np.linspace(1, src_radius, num=num_times)
+    for i in range(num_times):
+        cv2.circle(overlay, point, int(rad[i]), src_color, -1)
+        alp = alpha[num_times - i - 1] * alpha[num_times - i - 1] * alpha[num_times - i - 1]
+        cv2.addWeighted(overlay, alp, output, 1 - alp, 0, output)
+
+    image_rgb = output
+
+    if needs_float:
+        image_rgb = to_float(image_rgb, max_value=255)
+
+    return image_rgb
+
+
+@preserve_shape
+def add_shadow(img, vertices_list):
+    """Add shadows to the image.
+
+    From https://github.com/UjjwalSaxena/Automold--Road-Augmentation-Library
+
+    Args:
+        img (np.array):
+        vertices_list (list):
+
+    Returns:
+
+    """
+    non_rgb_warning(img)
+    input_dtype = img.dtype
+    needs_float = False
+
+    if input_dtype == np.float32:
+        img = from_float(img, dtype=np.dtype('uint8'))
+        needs_float = True
+    elif input_dtype not in (np.uint8, np.float32):
+        raise ValueError('Unexpected dtype {} for RandomSnow augmentation'.format(input_dtype))
+
+    image_hls = cv2.cvtColor(img, cv2.COLOR_RGB2HLS)
+    mask = np.zeros_like(img)
+
+    # adding all shadow polygons on empty mask, single 255 denotes only red channel
+    for vertices in vertices_list:
+        cv2.fillPoly(mask, vertices, 255)
+
+    # if red channel is hot, image's "Lightness" channel's brightness is lowered
+    red_max_value_ind = mask[:, :, 0] == 255
+    image_hls[:, :, 1][red_max_value_ind] = image_hls[:, :, 1][red_max_value_ind] * 0.5
+
+    image_rgb = cv2.cvtColor(image_hls, cv2.COLOR_HLS2RGB)
+
+    if needs_float:
+        image_rgb = to_float(image_rgb, max_value=255)
+
+    return image_rgb
+
+
+@preserve_shape
+def optical_distortion(img, k=0, dx=0, dy=0, interpolation=cv2.INTER_LINEAR, border_mode=cv2.BORDER_REFLECT_101,
+                       value=None):
     """Barrel / pincushion distortion. Unconventional augment.
 
     Reference:
@@ -407,13 +705,13 @@ def optical_distortion(img, k=0, dx=0, dy=0, interpolation=cv2.INTER_LINEAR, bor
 
     distortion = np.array([k, k, 0, 0, 0], dtype=np.float32)
     map1, map2 = cv2.initUndistortRectifyMap(camera_matrix, distortion, None, None, (width, height), cv2.CV_32FC1)
-    img = cv2.remap(img, map1, map2, interpolation=interpolation, borderMode=border_mode)
+    img = cv2.remap(img, map1, map2, interpolation=interpolation, borderMode=border_mode, borderValue=value)
     return img
 
 
 @preserve_shape
 def grid_distortion(img, num_steps=10, xsteps=[], ysteps=[], interpolation=cv2.INTER_LINEAR,
-                    border_mode=cv2.BORDER_REFLECT_101):
+                    border_mode=cv2.BORDER_REFLECT_101, value=None):
     """
     Reference:
         http://pythology.blogspot.sg/2014/03/interpolation-on-regular-distorted-grid.html
@@ -453,13 +751,13 @@ def grid_distortion(img, num_steps=10, xsteps=[], ysteps=[], interpolation=cv2.I
     map_x, map_y = np.meshgrid(xx, yy)
     map_x = map_x.astype(np.float32)
     map_y = map_y.astype(np.float32)
-    img = cv2.remap(img, map_x, map_y, interpolation=interpolation, borderMode=border_mode)
+    img = cv2.remap(img, map_x, map_y, interpolation=interpolation, borderMode=border_mode, borderValue=value)
     return img
 
 
 @preserve_shape
 def elastic_transform(image, alpha, sigma, alpha_affine, interpolation=cv2.INTER_LINEAR,
-                      border_mode=cv2.BORDER_REFLECT_101, random_state=None, approximate=False):
+                      border_mode=cv2.BORDER_REFLECT_101, value=None, random_state=None, approximate=False):
     """Elastic deformation of images as described in [Simard2003]_ (with modifications).
     Based on https://gist.github.com/erniejunior/601cdf56d2b424757de5
 
@@ -485,7 +783,8 @@ def elastic_transform(image, alpha, sigma, alpha_affine, interpolation=cv2.INTER
     pts2 = pts1 + random_state.uniform(-alpha_affine, alpha_affine, size=pts1.shape).astype(np.float32)
     matrix = cv2.getAffineTransform(pts1, pts2)
 
-    image = cv2.warpAffine(image, matrix, (width, height), flags=interpolation, borderMode=border_mode)
+    image = cv2.warpAffine(image, matrix, (width, height), flags=interpolation, borderMode=border_mode,
+                           borderValue=value)
 
     if approximate:
         # Approximate computation smooth displacement map with a large enough kernel.
@@ -506,12 +805,12 @@ def elastic_transform(image, alpha, sigma, alpha_affine, interpolation=cv2.INTER
     mapx = np.float32(x + dx)
     mapy = np.float32(y + dy)
 
-    return cv2.remap(image, mapx, mapy, interpolation, borderMode=border_mode)
+    return cv2.remap(image, mapx, mapy, interpolation, borderMode=border_mode, borderValue=value)
 
 
 @preserve_shape
 def elastic_transform_approx(image, alpha, sigma, alpha_affine, interpolation=cv2.INTER_LINEAR,
-                             border_mode=cv2.BORDER_REFLECT_101, random_state=None):
+                             border_mode=cv2.BORDER_REFLECT_101, value=None, random_state=None):
     """Elastic deformation of images as described in [Simard2003]_ (with modifications for speed).
     Based on https://gist.github.com/erniejunior/601cdf56d2b424757de5
 
@@ -537,7 +836,8 @@ def elastic_transform_approx(image, alpha, sigma, alpha_affine, interpolation=cv
     pts2 = pts1 + random_state.uniform(-alpha_affine, alpha_affine, size=pts1.shape).astype(np.float32)
     matrix = cv2.getAffineTransform(pts1, pts2)
 
-    image = cv2.warpAffine(image, matrix, (width, height), flags=interpolation, borderMode=border_mode)
+    image = cv2.warpAffine(image, matrix, (width, height), flags=interpolation,
+                           borderMode=border_mode, value=value)
 
     dx = (random_state.rand(height, width).astype(np.float32) * 2 - 1)
     cv2.GaussianBlur(dx, (17, 17), sigma, dst=dx)
@@ -552,17 +852,27 @@ def elastic_transform_approx(image, alpha, sigma, alpha_affine, interpolation=cv
     mapx = np.float32(x + dx)
     mapy = np.float32(y + dy)
 
-    return cv2.remap(image, mapx, mapy, interpolation, borderMode=border_mode)
+    return cv2.remap(image, mapx, mapy, interpolation, borderMode=border_mode, borderValue=value)
 
 
 def invert(img):
     return 255 - img
 
 
-def channel_shuffle(img):
-    ch_arr = [0, 1, 2]
-    random.shuffle(ch_arr)
-    img = img[..., ch_arr]
+def channel_shuffle(img, channels_shuffled):
+    img = img[..., channels_shuffled]
+    return img
+
+
+@preserve_shape
+def channel_dropout(img, channels_to_drop, fill_value=0):
+    if len(img.shape) == 2 or img.shape[2] == 1:
+        raise NotImplementedError("Only one channel. ChannelDropout is not defined.")
+
+    img = img.copy()
+
+    img[..., channels_to_drop] = fill_value
+
     return img
 
 
@@ -579,18 +889,14 @@ def gamma_transform(img, gamma):
 
 
 @clipped
-def gauss_noise(image, var):
-    mean = var
-    sigma = var ** 0.5
-    random_state = np.random.RandomState(random.randint(0, 2 ** 32 - 1))
-    gauss = random_state.normal(mean, sigma, image.shape)
-    gauss = (gauss - np.min(gauss)).astype(np.uint8)
-    return image.astype(np.int32) + gauss
+def gauss_noise(image, gauss):
+    image = image.astype('float32')
+    return image + gauss
 
 
-@clipped
-def brightness_contrast_adjust(img, alpha=1, beta=0):
+def _brightness_contrast_adjust_non_uint(img, alpha=1, beta=0):
     img = img.astype('float32')
+
     if alpha != 1:
         img *= alpha
     if beta != 0:
@@ -598,10 +904,76 @@ def brightness_contrast_adjust(img, alpha=1, beta=0):
     return img
 
 
+@preserve_shape
+def _brightness_contrast_adjust_uint(img, alpha=1, beta=0):
+    dtype = np.dtype('uint8')
+
+    max_value = MAX_VALUES_BY_DTYPE[dtype]
+
+    lut = np.arange(0, max_value + 1).astype('float32')
+
+    if alpha != 1:
+        lut *= alpha
+    if beta != 0:
+        lut += beta * np.mean(img)
+
+    lut = np.clip(lut, 0, max_value).astype(dtype)
+    img = cv2.LUT(img, lut)
+    return img
+
+
+@clipped
+def brightness_contrast_adjust(img, alpha=1, beta=0):
+    if img.dtype == np.uint8:
+        return _brightness_contrast_adjust_uint(img, alpha, beta)
+    else:
+        return _brightness_contrast_adjust_non_uint(img, alpha, beta)
+
+
+@clipped
+def iso_noise(image, color_shift=0.05, intensity=0.5, random_state=None, **kwargs):
+    """
+    Apply poisson noise to image to simulate camera sensor noise.
+
+    Args:
+        image: Input image, currently, only RGB, uint8 images are supported.
+        intensity: Multiplication factor for noise values. Values of ~0.5 are produce noticeable,
+                   yet acceptable level of noise.
+        random_state:
+        **kwargs:
+
+    Returns:
+        Noised image
+
+    """
+    assert image.dtype == np.uint8, 'Image must have uint8 channel type'
+    assert image.shape[2] == 3, 'Image must be RGB'
+
+    if random_state is None:
+        random_state = np.random.RandomState(42)
+
+    one_over_255 = float(1. / 255.)
+    image = np.multiply(image, one_over_255, dtype=np.float32)
+    hls = cv2.cvtColor(image, cv2.COLOR_RGB2HLS)
+    mean, stddev = cv2.meanStdDev(hls)
+
+    luminance_noise = random_state.poisson(stddev[1] * intensity * 255, size=hls.shape[:2])
+    color_noise = random_state.normal(0, color_shift * 360 * intensity, size=hls.shape[:2])
+
+    hue = hls[..., 0]
+    hue += color_noise
+    hue[hue < 0] += 360
+    hue[hue > 360] -= 360
+
+    luminance = hls[..., 1]
+    luminance += (luminance_noise / 255) * (1.0 - luminance)
+
+    image = cv2.cvtColor(hls, cv2.COLOR_HLS2RGB) * 255
+    return image.astype(np.uint8)
+
+
 def to_gray(img):
     gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
-    if np.mean(gray) > 127:
-        gray = 255 - gray
     return cv2.cvtColor(gray, cv2.COLOR_GRAY2RGB)
 
 
@@ -627,19 +999,6 @@ def from_float(img, dtype, max_value=None):
                 'passing the max_value argument'.format(dtype)
             )
     return (img * max_value).astype(dtype)
-
-
-def bbox_shift_scale_rotate(bbox, angle, scale, dx, dy, interpolation, rows, cols, **params):
-    center = (0.5, 0.5)
-    matrix = cv2.getRotationMatrix2D(center, angle, scale)
-    matrix[0, 2] += dx
-    matrix[1, 2] += dy
-    x = np.array([bbox[0], bbox[2], bbox[2], bbox[0]])
-    y = np.array([bbox[1], bbox[1], bbox[3], bbox[3]])
-    ones = np.ones(shape=(len(x)))
-    points_ones = np.vstack([x, y, ones]).transpose()
-    tr_points = matrix.dot(points_ones.T).T
-    return [min(tr_points[:, 0]), min(tr_points[:, 1]), max(tr_points[:, 0]), max(tr_points[:, 1])]
 
 
 def bbox_vflip(bbox, rows, cols):
@@ -734,13 +1093,14 @@ def bbox_rotate(bbox, angle, rows, cols, interpolation):
 
         return a tuple (x_min, y_min, x_max, y_max)
     """
+    scale = cols / float(rows)
     x = np.array([bbox[0], bbox[2], bbox[2], bbox[0]])
     y = np.array([bbox[1], bbox[1], bbox[3], bbox[3]])
     x = x - 0.5
     y = y - 0.5
     angle = np.deg2rad(angle)
-    x_t = np.cos(angle) * x + np.sin(angle) * y
-    y_t = -np.sin(angle) * x + np.cos(angle) * y
+    x_t = (np.cos(angle) * x * scale + np.sin(angle) * y) / scale
+    y_t = (-np.sin(angle) * x * scale + np.cos(angle) * y)
     x_t = x_t + 0.5
     y_t = y_t + 0.5
     return [min(x_t), min(y_t), max(x_t), max(y_t)]
@@ -830,9 +1190,10 @@ def keypoint_rotate(keypoint, angle, rows, cols, **params):
     return [x, y, a + math.radians(angle), s]
 
 
-def keypoint_scale(keypoint, scale, **params):
+def keypoint_scale(keypoint, scale_x, scale_y, **params):
+    """Scales a keypoint by scale_x and scale_y."""
     x, y, a, s = keypoint
-    return [x * scale, y * scale, a, s * scale]
+    return [x * scale_x, y * scale_y, a, s * max(scale_x, scale_y)]
 
 
 def crop_keypoint_by_coords(keypoint, crop_coords, crop_height, crop_width, rows, cols):
@@ -855,10 +1216,13 @@ def keypoint_center_crop(bbox, crop_height, crop_width, rows, cols):
     return crop_keypoint_by_coords(bbox, crop_coords, crop_height, crop_width, rows, cols)
 
 
-def keypoint_shift_scale_rotate(keypoint, angle, scale, dx, dy, rows, cols, **params):
-    x, y, a, s = keypoint
-    matrix = cv2.getRotationMatrix2D(((cols - 1) * 0.5, (rows - 1) * 0.5), angle, scale)
-    matrix[0, 2] += dx
-    matrix[1, 2] += dy
-    x, y = cv2.transform(np.array([[[x, y]]]), matrix).squeeze()
-    return [x, y, a + math.radians(angle), s * scale]
+def py3round(number):
+    """Unified rounding in all python versions."""
+    if abs(round(number) - number) == 0.5:
+        return int(2.0 * round(number / 2.0))
+
+    return int(round(number))
+
+
+def noop(input_obj, **params):
+    return input_obj

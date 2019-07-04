@@ -7,13 +7,18 @@ import numpy as np
 
 from albumentations.augmentations.keypoints_utils import convert_keypoints_from_albumentations, filter_keypoints, \
     convert_keypoints_to_albumentations, check_keypoints
-from albumentations.core.schedule import Schedule
+from albumentations.core.serialization import SerializableMeta
+from albumentations.core.six import add_metaclass
 from albumentations.core.transforms_interface import DualTransform
+from albumentations.core.utils import format_args
 from albumentations.imgaug.transforms import DualIAATransform
 from albumentations.augmentations.bbox_utils import convert_bboxes_from_albumentations, \
     convert_bboxes_to_albumentations, filter_bboxes, check_bboxes
 
 __all__ = ['Compose', 'OneOf', 'OneOrOther']
+
+
+REPR_INDENT_STEP = 2
 
 
 def find_dual_start_end(transforms):
@@ -50,6 +55,7 @@ def set_always_apply(transforms):
         t.always_apply = True
 
 
+@add_metaclass(SerializableMeta)
 class BaseCompose(object):
     def __init__(self, transforms, p):
         self.transforms = transforms
@@ -58,19 +64,32 @@ class BaseCompose(object):
     def __getitem__(self, item):
         return self.transforms[item]
 
-    def reset(self):
-        if isinstance(self.p, Schedule):
-            self.p.reset()
+    def __repr__(self):
+        return self.indented_repr()
 
+    def indented_repr(self, indent=REPR_INDENT_STEP):
+        args = {k: v for k, v in self._to_dict().items() if not (k.startswith('__') or k == 'transforms')}
+        repr_string = self.__class__.__name__ + '(['
         for t in self.transforms:
-            t.reset()
+            repr_string += '\n'
+            if hasattr(t, 'indented_repr'):
+                t_repr = t.indented_repr(indent + REPR_INDENT_STEP)
+            else:
+                t_repr = repr(t)
+            repr_string += ' ' * indent + t_repr + ','
+        repr_string += '\n' + ' ' * (indent - REPR_INDENT_STEP) + '], {args})'.format(args=format_args(args))
+        return repr_string
 
-    def step(self, current_step=None):
-        if isinstance(self.p, Schedule):
-            self.p.step(current_step)
+    @classmethod
+    def get_class_fullname(cls):
+        return '{cls.__module__}.{cls.__name__}'.format(cls=cls)
 
-        for t in self.transforms:
-            t.step(current_step)
+    def _to_dict(self):
+        return {
+            '__class_fullname__': self.get_class_fullname(),
+            'p': self.p,
+            'transforms': [t._to_dict() for t in self.transforms],
+        }
 
     def add_targets(self, additional_targets):
         if additional_targets:
@@ -103,30 +122,19 @@ class Compose(BaseCompose):
           | to remain this box in list. Default: 0.0.
     """
 
-    def __init__(self, transforms, preprocessing_transforms=[], postprocessing_transforms=[],
-                 to_tensor=None, bbox_params={}, keypoint_params={}, additional_targets={}, p=1.0):
-        if preprocessing_transforms:
-            warnings.warn("preprocessing transforms are deprecated, use always_apply flag for this purpose. "
-                          "will be removed in 0.3.0", DeprecationWarning)
-            set_always_apply(preprocessing_transforms)
-        if postprocessing_transforms:
-            warnings.warn("postprocessing transforms are deprecated, use always_apply flag for this purpose"
-                          "will be removed in 0.3.0", DeprecationWarning)
-            set_always_apply(postprocessing_transforms)
-        if to_tensor is not None:
-            warnings.warn("to_tensor in Compose is deprecated, use always_apply flag for this purpose"
-                          "will be removed in 0.3.0", DeprecationWarning)
-            to_tensor.always_apply = True
-            # todo deprecated
-        _transforms = (preprocessing_transforms +
-                       [t for t in transforms if t is not None] +
-                       postprocessing_transforms)
-        if to_tensor is not None:
-            _transforms.append(to_tensor)
-        super(Compose, self).__init__(_transforms, p)
+    def __init__(self, transforms, bbox_params=None, keypoint_params=None, additional_targets=None, p=1.0):
+        super(Compose, self).__init__([t for t in transforms if t is not None], p)
+
+        if bbox_params is None:
+            bbox_params = {}
+        if keypoint_params is None:
+            keypoint_params = {}
+        if additional_targets is None:
+            additional_targets = {}
 
         self.bboxes_name = 'bboxes'
         self.keypoints_name = 'keypoints'
+        self.additional_targets = additional_targets
         self.params = {
             self.bboxes_name: bbox_params,
             self.keypoints_name: keypoint_params
@@ -152,8 +160,8 @@ class Compose(BaseCompose):
 
         self.add_targets(additional_targets)
 
-    def __call__(self, **data):
-        need_to_run = random.random() < float(self.p)
+    def __call__(self, force_apply=False, **data):
+        need_to_run = force_apply or random.random() < self.p
         transforms = self.transforms if need_to_run else find_always_apply_transforms(self.transforms)
         dual_start_end = None
         if self.params[self.bboxes_name] or self.params[self.keypoints_name]:
@@ -183,7 +191,7 @@ class Compose(BaseCompose):
                     data = data_preprocessing(self.keypoints_name, self.params[self.keypoints_name], check_keypoints,
                                               convert_keypoints_to_albumentations, data)
 
-            data = t(**data)
+            data = t(force_apply=force_apply, **data)
 
             if dual_start_end is not None and idx == dual_start_end[1]:
                 if self.params[self.bboxes_name]:
@@ -194,6 +202,15 @@ class Compose(BaseCompose):
                                                filter_keypoints, convert_keypoints_from_albumentations, data)
 
         return data
+
+    def _to_dict(self):
+        dictionary = super(Compose, self)._to_dict()
+        dictionary.update({
+            'bbox_params': self.params[self.bboxes_name],
+            'keypoint_params': self.params[self.keypoints_name],
+            'additional_targets': self.additional_targets,
+        })
+        return dictionary
 
 
 def data_postprocessing(data_name, params, check_fn, filter_fn, convert_fn, data):
@@ -213,7 +230,8 @@ def data_postprocessing(data_name, params, check_fn, filter_fn, convert_fn, data
     if params['format'] == 'albumentations':
         check_fn(data[data_name])
     else:
-        data[data_name] = convert_fn(data[data_name], params['format'], rows, cols, check_validity=True)
+        data[data_name] = convert_fn(data[data_name], params['format'], rows, cols,
+                                     check_validity=bool(params.get('remove_invisible', True)))
 
     data = remove_label_fields_from_data(data_name, params.get('label_fields', []), data)
     return data
@@ -267,28 +285,23 @@ class OneOf(BaseCompose):
         s = sum(transforms_ps)
         self.transforms_ps = [t / s for t in transforms_ps]
 
-    def step(self, current_step=None):
-        for t in self.transforms:
-            t.step(current_step)
-
-        transforms_ps = [float(t.p) for t in self.transforms]
-        s = sum(transforms_ps)
-        self.transforms_ps = [t / s for t in transforms_ps]
-
-    def __call__(self, **data):
-        if random.random() < float(self.p):
+    def __call__(self, force_apply=False, **data):
+        if force_apply or random.random() < self.p:
             random_state = np.random.RandomState(random.randint(0, 2 ** 32 - 1))
             t = random_state.choice(self.transforms, p=self.transforms_ps)
-            t.p = 1.
-            data = t(**data)
+            data = t(force_apply=True, **data)
         return data
 
 
 class OneOrOther(BaseCompose):
-    def __init__(self, first, second, p=0.5):
-        super(OneOrOther, self).__init__([first, second], p)
-        for t in self.transforms:
-            t.p = 1.
 
-    def __call__(self, **data):
-        return self.transforms[0](**data) if random.random() < float(self.p) else self.transforms[-1](**data)
+    def __init__(self, first=None, second=None, transforms=None, p=0.5):
+        if transforms is None:
+            transforms = [first, second]
+        super(OneOrOther, self).__init__(transforms, p)
+
+    def __call__(self, force_apply=False, **data):
+        if random.random() < self.p:
+            return self.transforms[0](force_apply=True, **data)
+        else:
+            return self.transforms[-1](force_apply=True, **data)

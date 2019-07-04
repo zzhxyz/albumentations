@@ -1,37 +1,56 @@
+from __future__ import absolute_import
+
 import random
 
 import cv2
 
-from .schedule import Schedule
+from albumentations.core.serialization import SerializableMeta
+from albumentations.core.six import add_metaclass
+from albumentations.core.utils import format_args
 
 __all__ = ['to_tuple', 'BasicTransform', 'DualTransform', 'ImageOnlyTransform', 'NoOp']
 
 
-def to_tuple(param, low=None):
-    if isinstance(param, (list, tuple)):
-        return tuple(param)
-    elif param is not None:
-        if low is None:
-            return -param, param
-        return (low, param) if low < param else (param, low)
-    else:
+def to_tuple(param, low=None, bias=None):
+    """Convert input argument to min-max tuple
+    Args:
+        param (scalar, tuple or list of 2+ elements): Input value.
+            If value is scalar, return value would be (offset - value, offset + value).
+            If value is tuple, return value would be value + offset (broadcasted).
+        low:  Second element of tuple can be passed as optional argument
+        bias: An offset factor added to each element
+    """
+    if low is not None and bias is not None:
+        raise ValueError('Arguments low and bias are mutually exclusive')
+
+    if param is None:
         return param
 
+    if isinstance(param, (int, float)):
+        if low is None:
+            param = - param, + param
+        else:
+            param = (low, param) if low < param else (param, low)
+    elif isinstance(param, (list, tuple)):
+        param = tuple(param)
+    else:
+        raise ValueError('Argument param must be either scalar (int, float) or tuple')
 
+    if bias is not None:
+        return tuple([bias + x for x in param])
+
+    return tuple(param)
+
+
+@add_metaclass(SerializableMeta)
 class BasicTransform(object):
     def __init__(self, always_apply=False, p=0.5):
-        """
-
-        Args:
-            always_apply:
-            p: Either scalar or instance of Schedule
-        """
         self.p = p
         self.always_apply = always_apply
         self._additional_targets = {}
 
-    def __call__(self, **kwargs):
-        if (random.random() < float(self.p)) or self.always_apply:
+    def __call__(self, force_apply=False, **kwargs):
+        if (random.random() < self.p) or self.always_apply or force_apply:
             params = self.get_params()
             params = self.update_params(params, **kwargs)
             if self.targets_as_params:
@@ -48,6 +67,11 @@ class BasicTransform(object):
                     res[key] = None
             return res
         return kwargs
+
+    def __repr__(self):
+        state = self.get_base_init_args()
+        state.update(self.get_transform_init_args())
+        return '{name}({args})'.format(name=self.__class__.__name__, args=format_args(state))
 
     def _get_target_function(self, key):
         transform_key = key
@@ -73,7 +97,11 @@ class BasicTransform(object):
     def update_params(self, params, **kwargs):
         if hasattr(self, 'interpolation'):
             params['interpolation'] = self.interpolation
-        params.update({'cols': kwargs['image'].shape[1], 'rows': kwargs['image'].shape[0]})
+        if hasattr(self, 'fill_value'):
+            params['fill_value'] = self.fill_value
+        params.update(
+            {'cols': kwargs['image'].shape[1],
+             'rows': kwargs['image'].shape[0]})
         return params
 
     @property
@@ -96,16 +124,38 @@ class BasicTransform(object):
         return []
 
     def get_params_dependent_on_targets(self, params):
-        raise NotImplementedError('Method  get_params_dependent_on_targets is not implemented in class ' +
+        raise NotImplementedError('Method get_params_dependent_on_targets is not implemented in class ' +
                                   self.__class__.__name__)
 
-    def reset(self):
-        if isinstance(self.p, Schedule):
-            self.p.reset()
+    @classmethod
+    def get_class_fullname(cls):
+        return '{cls.__module__}.{cls.__name__}'.format(cls=cls)
 
-    def step(self, current_step=None):
-        if isinstance(self.p, Schedule):
-            self.p.step(current_step)
+    def get_transform_init_args_names(self):
+        raise NotImplementedError(
+            'Class {name} is not serializable because the `get_transform_init_args_names` method is not '
+            'implemented'.format(
+                name=self.get_class_fullname()
+            )
+        )
+
+    def get_base_init_args(self):
+        return {
+            'always_apply': self.always_apply,
+            'p': self.p,
+        }
+
+    def get_transform_init_args(self):
+        return {k: getattr(self, k) for k in self.get_transform_init_args_names()}
+
+    def _to_dict(self):
+        state = {
+            '__class_fullname__': self.get_class_fullname(),
+        }
+        state.update(self.get_base_init_args())
+        state.update(self.get_transform_init_args())
+        return state
+
 
 class DualTransform(BasicTransform):
     """Transform for segmentation task."""

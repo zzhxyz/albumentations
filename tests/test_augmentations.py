@@ -1,21 +1,20 @@
-import pytest
+import random
+
+import cv2
 import numpy as np
+import pytest
 
-try:
-    import torch
-    import torchvision
-    from albumentations.pytorch import ToTensor
-
-    torch_available = True
-except ImportError:
-    torch_available = False
-
-from albumentations import RandomCrop, PadIfNeeded, VerticalFlip, HorizontalFlip, Flip, Transpose, RandomRotate90, \
-    Rotate, ShiftScaleRotate, CenterCrop, OpticalDistortion, GridDistortion, ElasticTransform, ToGray, RandomGamma, \
-    JpegCompression, HueSaturationValue, RGBShift, RandomBrightness, RandomContrast, Blur, MotionBlur, MedianBlur, \
-    GaussNoise, CLAHE, ChannelShuffle, InvertImg, IAAEmboss, IAASuperpixels, IAASharpen, IAAAdditiveGaussianNoise, \
-    IAAPiecewiseAffine, IAAPerspective, Cutout, Normalize, ToFloat, FromFloat, RandomSizedCrop, RandomCropNearBBox, \
-    RandomBrightnessContrast
+from albumentations import (
+    RandomCrop, PadIfNeeded, VerticalFlip, HorizontalFlip, Flip, Transpose,
+    RandomRotate90, Rotate, ShiftScaleRotate, CenterCrop, OpticalDistortion,
+    GridDistortion, ElasticTransform, ToGray, RandomGamma, JpegCompression,
+    HueSaturationValue, RGBShift, Blur, MotionBlur, MedianBlur, GaussianBlur,
+    GaussNoise, CLAHE, ChannelShuffle, InvertImg, IAAEmboss, IAASuperpixels,
+    IAASharpen, IAAAdditiveGaussianNoise, IAAPiecewiseAffine, IAAPerspective,
+    Cutout, CoarseDropout, Normalize, ToFloat, FromFloat,
+    RandomBrightnessContrast, RandomSnow, RandomRain, RandomFog,
+    RandomSunFlare, RandomCropNearBBox, RandomShadow, RandomSizedCrop,
+    ChannelDropout, ISONoise)
 
 
 @pytest.mark.parametrize(['augmentation_cls', 'params'], [
@@ -26,6 +25,7 @@ from albumentations import RandomCrop, PadIfNeeded, VerticalFlip, HorizontalFlip
     [Blur, {}],
     [MotionBlur, {}],
     [MedianBlur, {}],
+    [GaussianBlur, {}],
     [GaussNoise, {}],
     [CLAHE, {}],
     [ChannelShuffle, {}],
@@ -33,7 +33,15 @@ from albumentations import RandomCrop, PadIfNeeded, VerticalFlip, HorizontalFlip
     [RandomGamma, {}],
     [ToGray, {}],
     [Cutout, {}],
+    [CoarseDropout, {}],
     [GaussNoise, {}],
+    [RandomSnow, {}],
+    [RandomRain, {}],
+    [RandomFog, {}],
+    [RandomSunFlare, {}],
+    [RandomShadow, {}],
+    [ChannelDropout, {}],
+    [ISONoise, {}],
 ])
 def test_image_only_augmentations(augmentation_cls, params, image, mask):
     aug = augmentation_cls(p=1, **params)
@@ -50,6 +58,7 @@ def test_image_only_augmentations(augmentation_cls, params, image, mask):
     [Blur, {}],
     [MotionBlur, {}],
     [MedianBlur, {'blur_limit': (3, 5)}],
+    [GaussianBlur, {}],
     [GaussNoise, {}],
     [ChannelShuffle, {}],
     [InvertImg, {}],
@@ -57,7 +66,14 @@ def test_image_only_augmentations(augmentation_cls, params, image, mask):
     [JpegCompression, {}],
     [ToGray, {}],
     [Cutout, {}],
+    [CoarseDropout, {}],
     [GaussNoise, {}],
+    [RandomSnow, {}],
+    [RandomRain, {}],
+    [RandomFog, {}],
+    [RandomSunFlare, {}],
+    [RandomShadow, {}],
+    [ChannelDropout, {}],
 ])
 def test_image_only_augmentations_with_float_values(augmentation_cls, params, float_image, mask):
     aug = augmentation_cls(p=1, **params)
@@ -82,6 +98,7 @@ def test_image_only_augmentations_with_float_values(augmentation_cls, params, fl
     [CenterCrop, {'height': 10, 'width': 10}],
     [RandomCrop, {'height': 10, 'width': 10}],
     [RandomSizedCrop, {'min_max_height': (4, 8), 'height': 10, 'width': 10}],
+    [ISONoise, {}],
 ])
 def test_dual_augmentations(augmentation_cls, params, image, mask):
     aug = augmentation_cls(p=1, **params)
@@ -130,14 +147,6 @@ def test_imgaug_dual_augmentations(augmentation_cls, image, mask):
     assert data['mask'].dtype == np.uint8
 
 
-@pytest.mark.skipif(not torch_available, reason='PyTorch and torchvision are not available')
-def test_torch_to_tensor_augmentations(image, mask):
-    aug = ToTensor()
-    data = aug(image=image, mask=mask)
-    assert data['image'].dtype == torch.float32
-    assert data['mask'].dtype == torch.float32
-
-
 @pytest.mark.parametrize(['augmentation_cls', 'params'], [
     [Cutout, {}],
     [JpegCompression, {}],
@@ -148,6 +157,7 @@ def test_torch_to_tensor_augmentations(image, mask):
     [Blur, {}],
     [MotionBlur, {}],
     [MedianBlur, {}],
+    [GaussianBlur, {}],
     [GaussNoise, {}],
     [CLAHE, {}],
     [ChannelShuffle, {}],
@@ -155,6 +165,7 @@ def test_torch_to_tensor_augmentations(image, mask):
     [RandomGamma, {}],
     [ToGray, {}],
     [Cutout, {}],
+    [CoarseDropout, {}],
     [PadIfNeeded, {}],
     [VerticalFlip, {}],
     [HorizontalFlip, {}],
@@ -173,6 +184,13 @@ def test_torch_to_tensor_augmentations(image, mask):
     [GaussNoise, {}],
     [ToFloat, {}],
     [FromFloat, {}],
+    [RandomSnow, {}],
+    [RandomRain, {}],
+    [RandomFog, {}],
+    [RandomSunFlare, {}],
+    [RandomShadow, {}],
+    [ChannelDropout, {}],
+    [ISONoise, {}],
 ])
 def test_augmentations_wont_change_input(augmentation_cls, params, image, mask):
     image_copy = image.copy()
@@ -185,6 +203,7 @@ def test_augmentations_wont_change_input(augmentation_cls, params, image, mask):
 
 @pytest.mark.parametrize(['augmentation_cls', 'params'], [
     [Cutout, {}],
+    [CoarseDropout, {}],
     [HueSaturationValue, {}],
     [RGBShift, {}],
     [RandomBrightnessContrast, {}],
@@ -192,12 +211,12 @@ def test_augmentations_wont_change_input(augmentation_cls, params, image, mask):
     [Blur, {}],
     [MotionBlur, {}],
     [MedianBlur, {'blur_limit': (3, 5)}],
+    [GaussianBlur, {}],
     [GaussNoise, {}],
     [ChannelShuffle, {}],
     [InvertImg, {}],
     [RandomGamma, {}],
     [ToGray, {}],
-    [Cutout, {}],
     [PadIfNeeded, {}],
     [VerticalFlip, {}],
     [HorizontalFlip, {}],
@@ -216,6 +235,12 @@ def test_augmentations_wont_change_input(augmentation_cls, params, image, mask):
     [GaussNoise, {}],
     [ToFloat, {}],
     [FromFloat, {}],
+    [RandomSnow, {}],
+    [RandomRain, {}],
+    [RandomFog, {}],
+    [RandomSunFlare, {}],
+    [RandomShadow, {}],
+    [ChannelDropout, {}],
 ])
 def test_augmentations_wont_change_float_input(augmentation_cls, params, float_image):
     float_image_copy = float_image.copy()
@@ -226,15 +251,16 @@ def test_augmentations_wont_change_float_input(augmentation_cls, params, float_i
 
 @pytest.mark.parametrize(['augmentation_cls', 'params'], [
     [Cutout, {}],
+    [CoarseDropout, {}],
     [JpegCompression, {}],
     [RandomBrightnessContrast, {}],
     [Blur, {}],
     [MotionBlur, {}],
     [MedianBlur, {}],
+    [GaussianBlur, {}],
     [GaussNoise, {}],
     [InvertImg, {}],
     [RandomGamma, {}],
-    [Cutout, {}],
     [VerticalFlip, {}],
     [HorizontalFlip, {}],
     [Flip, {}],
@@ -277,6 +303,7 @@ def test_augmentations_wont_change_shape_grayscale(augmentation_cls, params, ima
 
 @pytest.mark.parametrize(['augmentation_cls', 'params'], [
     [Cutout, {}],
+    [CoarseDropout, {}],
     [JpegCompression, {}],
     [HueSaturationValue, {}],
     [RGBShift, {}],
@@ -284,13 +311,13 @@ def test_augmentations_wont_change_shape_grayscale(augmentation_cls, params, ima
     [Blur, {}],
     [MotionBlur, {}],
     [MedianBlur, {}],
+    [GaussianBlur, {}],
     [GaussNoise, {}],
     [CLAHE, {}],
     [ChannelShuffle, {}],
     [InvertImg, {}],
     [RandomGamma, {}],
     [ToGray, {}],
-    [Cutout, {}],
     [VerticalFlip, {}],
     [HorizontalFlip, {}],
     [Flip, {}],
@@ -304,6 +331,13 @@ def test_augmentations_wont_change_shape_grayscale(augmentation_cls, params, ima
     [GaussNoise, {}],
     [ToFloat, {}],
     [FromFloat, {}],
+    [RandomSnow, {}],
+    [RandomRain, {}],
+    [RandomFog, {}],
+    [RandomSunFlare, {}],
+    [RandomShadow, {}],
+    [ChannelDropout, {}],
+    [ISONoise, {}],
 ])
 def test_augmentations_wont_change_shape_rgb(augmentation_cls, params, image, mask):
     aug = augmentation_cls(p=1, **params)
@@ -325,3 +359,21 @@ def test_image_only_crop_around_bbox_augmentation(augmentation_cls, params, imag
     annotations = {'image': image, 'cropping_bbox': [-59, 77, 177, 231]}
     data = aug(**annotations)
     assert data['image'].dtype == np.uint8
+
+
+@pytest.mark.parametrize(['augmentation_cls', 'params'], [
+    [PadIfNeeded, {'min_height': 514, 'min_width': 514,
+                   'border_mode': cv2.BORDER_CONSTANT, 'value': 100, 'mask_value': 1}],
+    [Rotate, {'border_mode': cv2.BORDER_CONSTANT, 'value': 100, 'mask_value': 1}],
+    [ShiftScaleRotate, {'border_mode': cv2.BORDER_CONSTANT, 'value': 100, 'mask_value': 1}],
+    [OpticalDistortion, {'border_mode': cv2.BORDER_CONSTANT, 'value': 100, 'mask_value': 1}],
+    [ElasticTransform, {'border_mode': cv2.BORDER_CONSTANT, 'value': 100, 'mask_value': 1}],
+    [GridDistortion, {'border_mode': cv2.BORDER_CONSTANT, 'value': 100, 'mask_value': 1}],
+])
+def test_mask_fill_value(augmentation_cls, params):
+    random.seed(42)
+    aug = augmentation_cls(p=1, **params)
+    input = {'image': np.zeros((512, 512), dtype=np.uint8) + 100, 'mask': np.ones((512, 512))}
+    output = aug(**input)
+    assert (output['image'] == 100).all()
+    assert (output['mask'] == 1).all()
