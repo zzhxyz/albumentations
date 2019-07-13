@@ -2,73 +2,78 @@ from __future__ import absolute_import
 
 import numpy as np
 import torch
-from torchvision.transforms import functional as F
 
-from ..core.transforms_interface import BasicTransform
+from ..core.transforms_interface import DualTransform
 
 
 __all__ = ['ToTensor']
 
 
-def img_to_tensor(im, normalize=None):
-    tensor = torch.from_numpy(np.moveaxis(im / (255. if im.dtype == np.uint8 else 1), -1, 0).astype(np.float32))
-    if normalize is not None:
-        return F.normalize(tensor, **normalize)
-    return tensor
+def array_to_tensor(image, 
+    dtype=torch.float32, 
+    ensure_channel_dim=True, 
+    one_hot_channels=None, 
+    binarize_threshold=None):
+    assert len(image.shape) in {2,3}, 'Only images of shape HW or HWC are supported'
+    assert not (one_hot_channels and binarize_threshold), 'one_hot_channels and binarize_threshold are mutually exclusive'
+
+    if len(image.shape) == 2 and ensure_channel_dim:
+        image = np.expand_dims(image, -1)
+
+    if len(mask.shape) == 3:
+        # HWC -> CHW
+        mask = np.moveaxis(image, -1, 0)
+
+    if one_hot_channels > 0:
+        mask = np.eye(one_hot_channels)[mask]
+
+    if binarize_threshold:
+        mask = mask > binarize_threshold
+
+    return torch.from_numpy(mask).type(dtype)
 
 
-def mask_to_tensor(mask, num_classes, sigmoid):
-    # todo
-    if num_classes > 1:
-        if not sigmoid:
-            # softmax
-            long_mask = np.zeros((mask.shape[:2]), dtype=np.int64)
-            if len(mask.shape) == 3:
-                for c in range(mask.shape[2]):
-                    long_mask[mask[..., c] > 0] = c
-            else:
-                long_mask[mask > 127] = 1
-                long_mask[mask == 0] = 0
-            mask = long_mask
-        else:
-            mask = np.moveaxis(mask / (255. if mask.dtype == np.uint8 else 1), -1, 0).astype(np.float32)
-    else:
-        mask = np.expand_dims(mask / (255. if mask.dtype == np.uint8 else 1), 0).astype(np.float32)
-    return torch.from_numpy(mask)
-
-
-class ToTensor(BasicTransform):
-    """Convert image and mask to `torch.Tensor` and divide by 255 if image or mask are `uint8` type.
-    WARNING! Please use this with care and look into sources before usage.
+class ToTensor(DualTransform):
+    """Convert image and mask to `torch.Tensor`.
 
     Args:
-        num_classes (int): only for segmentation
-        sigmoid (bool, optional): only for segmentation, transform mask to LongTensor or not.
-        normalize (dict, optional): dict with keys [mean, std] to pass it into torchvision.normalize
-
+        image_dtype : torch data type of image tensor
+        image_ensure_channel_dim (bool): ensures that image tensor will have dummy channel dimension 
+            for single-channel input image.
+        mask_dtype : torch data type of mask tensor
+        mask_ensure_channel_dim (bool): ensures that mask tensor will have dummy channel dimension 
+            for single-channel mask image.
+        mask_one_hot_channels: Defines number of channels for one-hot encoding mask.
     """
 
-    def __init__(self, num_classes=1, sigmoid=True, normalize=None):
+    def __init__(self, 
+            image_dtype=torch.float32, 
+            image_ensure_channel_dim=True,
+            mask_dtype=torch.float32,
+            mask_ensure_channel_dim=True,
+            mask_one_hot_channels=None):
         super(ToTensor, self).__init__(always_apply=True, p=1.)
-        self.num_classes = num_classes
-        self.sigmoid = sigmoid
-        self.normalize = normalize
+        self.image_dtype = image_dtype
+        self.image_ensure_channel_dim = image_ensure_channel_dim
+        self.mask_dtype = mask_dtype
+        self.mask_ensure_channel_dim = mask_ensure_channel_dim
+        self.mask_one_hot_channels = mask_one_hot_channels
 
-    def __call__(self, force_apply=True, **kwargs):
-        kwargs.update({'image': img_to_tensor(kwargs['image'], self.normalize)})
-        if 'mask' in kwargs.keys():
-            kwargs.update({'mask': mask_to_tensor(kwargs['mask'], self.num_classes, sigmoid=self.sigmoid)})
 
-        for k, v in kwargs.items():
-            if self._additional_targets.get(k) == 'image':
-                kwargs.update({k: img_to_tensor(kwargs[k], self.normalize)})
-            if self._additional_targets.get(k) == 'mask':
-                kwargs.update({k: mask_to_tensor(kwargs[k], self.num_classes, sigmoid=self.sigmoid)})
-        return kwargs
+    def apply(self, image, **kwargs):
+        return array_to_tensor(image, 
+            dtype=self.image_dtype, 
+            ensure_channel_dim=self.image_ensure_channel_dim)
 
-    @property
-    def targets(self):
-        raise NotImplementedError
+    def apply_to_mask(self, image, **kwargs):
+        return array_to_tensor(image,
+            dtype=self.mask_dtype,
+            ensure_channel_dim=self.mask_ensure_channel_dim,
+            one_hot_channels=self.mask_one_hot_channels)
 
     def get_transform_init_args_names(self):
-        return ('num_classes', 'sigmoid', 'normalize')
+        return ('image_dtype', 
+            'image_ensure_channel_dim', 
+            'mask_dtype', 
+            'mask_ensure_channel_dim', 
+            'mask_one_hot_channels')
