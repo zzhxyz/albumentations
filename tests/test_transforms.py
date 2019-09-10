@@ -206,7 +206,6 @@ def test_force_apply():
 @pytest.mark.parametrize(['augmentation_cls', 'params'], [
     [A.ChannelShuffle, {}],
     [A.GaussNoise, {}],
-    [A.Cutout, {}],
     [A.CoarseDropout, {}],
     [A.JpegCompression, {}],
     [A.HueSaturationValue, {}],

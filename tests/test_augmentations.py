@@ -11,7 +11,7 @@ from albumentations import (
     HueSaturationValue, RGBShift, Blur, MotionBlur, MedianBlur, GaussianBlur,
     GaussNoise, CLAHE, ChannelShuffle, InvertImg, IAAEmboss, IAASuperpixels,
     IAASharpen, IAAAdditiveGaussianNoise, IAAPiecewiseAffine, IAAPerspective,
-    Cutout, CoarseDropout, Normalize, ToFloat, FromFloat,
+    CoarseDropout, Normalize, ToFloat, FromFloat,
     RandomBrightnessContrast, RandomSnow, RandomRain, RandomFog,
     RandomSunFlare, RandomCropNearBBox, RandomShadow, RandomSizedCrop, RandomResizedCrop,
     ChannelDropout, ISONoise, Solarize, Equalize)
@@ -32,7 +32,6 @@ from albumentations import (
     [InvertImg, {}],
     [RandomGamma, {}],
     [ToGray, {}],
-    [Cutout, {}],
     [CoarseDropout, {}],
     [GaussNoise, {}],
     [RandomSnow, {}],
@@ -67,7 +66,6 @@ def test_image_only_augmentations(augmentation_cls, params, image, mask):
     [RandomGamma, {}],
     [JpegCompression, {}],
     [ToGray, {}],
-    [Cutout, {}],
     [CoarseDropout, {}],
     [GaussNoise, {}],
     [RandomSnow, {}],
@@ -155,7 +153,6 @@ def test_imgaug_dual_augmentations(augmentation_cls, image, mask):
 
 
 @pytest.mark.parametrize(['augmentation_cls', 'params'], [
-    [Cutout, {}],
     [JpegCompression, {}],
     [HueSaturationValue, {}],
     [RGBShift, {}],
@@ -171,7 +168,6 @@ def test_imgaug_dual_augmentations(augmentation_cls, image, mask):
     [InvertImg, {}],
     [RandomGamma, {}],
     [ToGray, {}],
-    [Cutout, {}],
     [CoarseDropout, {}],
     [PadIfNeeded, {}],
     [VerticalFlip, {}],
@@ -213,7 +209,6 @@ def test_augmentations_wont_change_input(augmentation_cls, params, image, mask):
 
 
 @pytest.mark.parametrize(['augmentation_cls', 'params'], [
-    [Cutout, {}],
     [CoarseDropout, {}],
     [HueSaturationValue, {}],
     [RGBShift, {}],
@@ -264,7 +259,6 @@ def test_augmentations_wont_change_float_input(augmentation_cls, params, float_i
 
 
 @pytest.mark.parametrize(['augmentation_cls', 'params'], [
-    [Cutout, {}],
     [CoarseDropout, {}],
     [JpegCompression, {}],
     [RandomBrightnessContrast, {}],
@@ -319,7 +313,6 @@ def test_augmentations_wont_change_shape_grayscale(augmentation_cls, params, ima
 
 
 @pytest.mark.parametrize(['augmentation_cls', 'params'], [
-    [Cutout, {}],
     [CoarseDropout, {}],
     [JpegCompression, {}],
     [HueSaturationValue, {}],
