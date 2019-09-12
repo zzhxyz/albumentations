@@ -17,6 +17,10 @@ IGNORED_CLASSES = {
     'ImageOnlyTransform',
 }
 
+DEPRECATED_CLASSES = {
+    'RandomBrightness',
+    'RandomContrast',
+}
 
 READTHEDOCS_TEMPLATE = '[{name}](https://albumentations.readthedocs.io/en/latest/api/augmentations.html#albumentations'
 TRANSFORM_NAME_WITH_LINK_TEMPLATE = READTHEDOCS_TEMPLATE + '.augmentations.transforms.{name})'
@@ -51,7 +55,8 @@ def get_transforms_info():
         if (
             inspect.isclass(cls) and
             issubclass(cls, albumentations.BasicTransform) and
-            name not in IGNORED_CLASSES
+            name not in IGNORED_CLASSES and
+            name not in DEPRECATED_CLASSES
         ):
 
             targets = {Targets.IMAGE}
