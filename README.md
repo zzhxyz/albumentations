@@ -205,22 +205,22 @@ The table shows how many images per second can be processed on a single core, hi
 
 |                    | albumentations <br><small>0.4.0</small> |  imgaug <br><small>0.2.9</small> | torchvision (Pillow backend) <br><small>0.4.0</small>  | torchvision (Pillow-SIMD backend) <br><small>0.4.0</small> | keras  <br><small>2.3.1</small> | augmentor  <br><small>0.2.6</small> | solt  <br><small>0.1.8</small>  |
 |------------------------|:--------------:|:------:|:--------------------:|:-------------------------:|:-----:|:---------:|:-----:|
-| HorizontalFlip         |       961      |   754  |         **1246**     |            1251           |  669  |    1154   |  619  |
-| VerticalFlip           |     **3941**   |  2069  |         1105         |            1150           |  3884 |    1054   |  3540 |
-| Rotate                 |     **375**    |   300  |          83          |            120            |   18  |     36    |   91  |
-| ShiftScaleRotate       |     **664**    |   454  |          75          |            116            |   23  |     -     |   -   |
-| Brightness             |     **1806**   |  1067  |          260         |            320            |  133  |    252    |  1694 |
-| Contrast               |     **1701**   |  1123  |          190         |            241            |   -   |    184    |  1699 |
-| BrightnessContrast     |     **1749**   |   577  |          114         |            143            |   -   |    112    |  880  |
-| ShiftRGB               |     **1813**   |   984  |           -          |             -             |  509  |     -     |   -   |
-| ShiftHSV               |     **349**    |   340  |          35          |             45            |   -   |     -     |  106  |
-| Gamma                  |     **1926**   |    -   |          549         |            580            |   -   |     -     |  701  |
-| Grayscale              |     **3688**   |   307  |          487         |            574            |   -   |    872    |  2927 |
-| RandomCrop64           |     **602010** |  2908  |         22398        |           33850           |   -   |   14267   | 38450 |
-| PadToSize512           |     **2749**   |    -   |          350         |            378            |   -   |     -     |  2370 |
-| Resize512              |       576      |   427  |          211         |            **648**        |   -   |    213    |  568  |
-| RandomSizedCrop_64_512 |     **2223**   |   715  |          334         |            1023           |   -   |    339    |  1949 |
-| Equalize               |     **466**    |  460   |           -          |             -             |   -   |    256    |   -   |
+| HorizontalFlip       |       961      |   754  |         1246         |          **1251**         |  669  |    1154   |  619  |
+| VerticalFlip         |     **3941**   |  2069  |         1105         |            1150           |  3884 |    1054   |  3540 |
+| Rotate               |     **375**    |   300  |          83          |            120            |   18  |     36    |   91  |
+| ShiftScaleRotate     |     **664**    |   454  |          75          |            116            |   23  |     -     |   -   |
+| Brightness           |     **1806**   |  1067  |          260         |            320            |  133  |    252    |  1694 |
+| Contrast             |     **1701**   |  1123  |          190         |            241            |   -   |    184    |  1699 |
+| BrightnessContrast   |     **1749**   |   577  |          114         |            143            |   -   |    112    |  880  |
+| ShiftRGB             |     **1813**   |   984  |           -          |             -             |  509  |     -     |   -   |
+| ShiftHSV             |     **349**    |   340  |          35          |             45            |   -   |     -     |  106  |
+| Gamma                |     **1926**   |    -   |          549         |            580            |   -   |     -     |  701  |
+| Grayscale            |     **3688**   |   307  |          487         |            574            |   -   |    872    |  2927 |
+| RandomCrop64         |     **602010** |  2908  |         22398        |           33850           |   -   |   14267   | 38450 |
+| PadToSize512         |     **2749**   |    -   |          350         |            378            |   -   |     -     |  2370 |
+| Resize512            |       576      |   427  |          211         |            **648**        |   -   |    213    |  568  |
+| RandSizeCrop_64_512  |     **2223**   |   715  |          334         |            1023           |   -   |    339    |  1949 |
+| Equalize             |     **466**    |  460   |           -          |             -             |   -   |    256    |   -   |
 
 Python and library versions: Python 3.7.3, numpy 1.17.2, pillow 6.2.0, pillow-simd 6.0.0.post0, opencv-python 4.1.1.26, scikit-image 0.15.0, scipy 1.3.0.
 
