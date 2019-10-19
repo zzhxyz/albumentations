@@ -9,15 +9,16 @@ environment:
   matrix:
     - PYTHON: 'C:\Python27-x64'
     - PYTHON: 'C:\Python35-x64'
-      PYTORCH_WHEEL: 'https://download.pytorch.org/whl/cpu/torch-1.0.1-cp35-cp35m-win_amd64.whl'
+      INSTALL_PYTORCH_WHEEL: 'TRUE'
     - PYTHON: 'C:\Python36-x64'
-      PYTORCH_WHEEL: 'https://download.pytorch.org/whl/cpu/torch-1.0.1-cp36-cp36m-win_amd64.whl'
+      INSTALL_PYTORCH_WHEEL: 'TRUE'
     - PYTHON: 'C:\Python37-x64'
-      PYTORCH_WHEEL: 'https://download.pytorch.org/whl/cpu/torch-1.0.1-cp37-cp37m-win_amd64.whl'
+      INSTALL_PYTORCH_WHEEL: 'TRUE'
+    - PYTHON: 'C:\Python38-x64'
 
 install:
   - '%PYTHON%\python.exe -m pip install -U pip wheel setuptools'
-  - 'if defined PYTORCH_WHEEL %PYTHON%\python.exe -m pip install %PYTORCH_WHEEL% torchvision'
+  - 'if defined INSTALL_PYTORCH_WHEEL %PYTHON%\python.exe -m pip install torch==1.3.0+cpu torchvision==0.4.1+cpu -f https://download.pytorch.org/whl/torch_stable.html'
   - '%PYTHON%\python.exe -m pip install .[tests]'
   - '%PYTHON%\python.exe -m pip install "pydocstyle<4.0.0" flake8 flake8-docstrings'
 
