@@ -139,7 +139,13 @@ class BasicTransform(object):
             params["interpolation"] = self.interpolation
         if hasattr(self, "fill_value"):
             params["fill_value"] = self.fill_value
-        params.update({"cols": kwargs["image"].shape[1], "rows": kwargs["image"].shape[0]})
+
+        if "image_shape" in kwargs:
+            params.update({"cols": kwargs["image_shape"][1],
+                           "rows": kwargs["image_shape"][0]})
+        else:
+            params.update({"cols": kwargs["image"].shape[1],
+                           "rows": kwargs["image"].shape[0]})
         return params
 
     @property

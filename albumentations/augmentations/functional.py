@@ -50,8 +50,10 @@ def preserve_shape(func):
 
     @wraps(func)
     def wrapped_function(img, *args, **kwargs):
-        shape = img.shape
         result = func(img, *args, **kwargs)
+        if isinstance(img, cv2.UMat):
+            return result
+        shape = img.shape
         result = result.reshape(shape)
         return result
 
@@ -66,8 +68,12 @@ def preserve_channel_dim(func):
 
     @wraps(func)
     def wrapped_function(img, *args, **kwargs):
-        shape = img.shape
         result = func(img, *args, **kwargs)
+
+        if isinstance(img, cv2.UMat):
+            return result
+
+        shape = img.shape
         if len(shape) == 3 and shape[-1] == 1 and len(result.shape) == 2:
             result = np.expand_dims(result, axis=-1)
         return result
@@ -162,7 +168,7 @@ def _maybe_process_in_chunks(process_fn, **kwargs):
     """
 
     def __process_fn(img):
-        num_channels = get_num_channels(img)
+        num_channels = get_num_channels(img) if isinstance(img, np.ndarray) else -1
         if num_channels > 4:
             chunks = []
             for index in range(0, num_channels, 4):
@@ -203,9 +209,11 @@ def scale(img, scale, interpolation=cv2.INTER_LINEAR):
 
 @preserve_channel_dim
 def shift_scale_rotate(
-    img, angle, scale, dx, dy, interpolation=cv2.INTER_LINEAR, border_mode=cv2.BORDER_REFLECT_101, value=None
+    img, angle, scale, dx, dy, interpolation=cv2.INTER_LINEAR, border_mode=cv2.BORDER_REFLECT_101, value=None, height=None, width=None
 ):
-    height, width = img.shape[:2]
+    if height is None or width is None:
+        height, width = img.shape[:2]
+
     center = (width / 2, height / 2)
     matrix = cv2.getRotationMatrix2D(center, angle, scale)
     matrix[0, 2] += dx * width
@@ -298,8 +306,10 @@ def get_random_crop_coords(height, width, crop_height, crop_width, h_start, w_st
     return x1, y1, x2, y2
 
 
-def random_crop(img, crop_height, crop_width, h_start, w_start):
-    height, width = img.shape[:2]
+def random_crop(img, crop_height, crop_width, h_start, w_start, height=None, width=None):
+    if height is None or width is None:
+        height, width = img.shape[:2]
+
     if height < crop_height or width < crop_width:
         raise ValueError(
             "Requested crop size ({crop_height}, {crop_width}) is "
@@ -308,7 +318,10 @@ def random_crop(img, crop_height, crop_width, h_start, w_start):
             )
         )
     x1, y1, x2, y2 = get_random_crop_coords(height, width, crop_height, crop_width, h_start, w_start)
-    img = img[y1:y2, x1:x2]
+    if isinstance(img, cv2.UMat):
+        img = cv2.UMat(img, [y1,y2],[x1, x2])
+    else:
+        img = img[y1:y2, x1:x2]
     return img
 
 

@@ -11,7 +11,8 @@ import numpy as np
 
 from . import functional as F
 from .bbox_utils import denormalize_bbox, normalize_bbox, union_of_bboxes
-from ..core.transforms_interface import DualTransform, ImageOnlyTransform, NoOp, to_tuple
+from ..core.transforms_interface import DualTransform, ImageOnlyTransform, \
+    NoOp, to_tuple
 from ..core.utils import format_args
 
 __all__ = [
@@ -73,6 +74,8 @@ __all__ = [
     "Equalize",
     "Posterize",
     "Downscale",
+    "ToOpenCL",
+    "ToNumpy"
 ]
 
 
@@ -98,14 +101,14 @@ class PadIfNeeded(DualTransform):
     """
 
     def __init__(
-        self,
-        min_height=1024,
-        min_width=1024,
-        border_mode=cv2.BORDER_REFLECT_101,
-        value=None,
-        mask_value=None,
-        always_apply=False,
-        p=1.0,
+            self,
+            min_height=1024,
+            min_width=1024,
+            border_mode=cv2.BORDER_REFLECT_101,
+            value=None,
+            mask_value=None,
+            always_apply=False,
+            p=1.0,
     ):
         super(PadIfNeeded, self).__init__(always_apply, p)
         self.min_height = min_height
@@ -134,31 +137,41 @@ class PadIfNeeded(DualTransform):
             w_pad_right = 0
 
         params.update(
-            {"pad_top": h_pad_top, "pad_bottom": h_pad_bottom, "pad_left": w_pad_left, "pad_right": w_pad_right}
+            {"pad_top": h_pad_top, "pad_bottom": h_pad_bottom,
+             "pad_left": w_pad_left, "pad_right": w_pad_right}
         )
         return params
 
-    def apply(self, img, pad_top=0, pad_bottom=0, pad_left=0, pad_right=0, **params):
+    def apply(self, img, pad_top=0, pad_bottom=0, pad_left=0, pad_right=0,
+              **params):
         return F.pad_with_params(
-            img, pad_top, pad_bottom, pad_left, pad_right, border_mode=self.border_mode, value=self.value
+            img, pad_top, pad_bottom, pad_left, pad_right,
+            border_mode=self.border_mode, value=self.value
         )
 
-    def apply_to_mask(self, img, pad_top=0, pad_bottom=0, pad_left=0, pad_right=0, **params):
+    def apply_to_mask(self, img, pad_top=0, pad_bottom=0, pad_left=0,
+                      pad_right=0, **params):
         return F.pad_with_params(
-            img, pad_top, pad_bottom, pad_left, pad_right, border_mode=self.border_mode, value=self.mask_value
+            img, pad_top, pad_bottom, pad_left, pad_right,
+            border_mode=self.border_mode, value=self.mask_value
         )
 
-    def apply_to_bbox(self, bbox, pad_top=0, pad_bottom=0, pad_left=0, pad_right=0, rows=0, cols=0, **params):
+    def apply_to_bbox(self, bbox, pad_top=0, pad_bottom=0, pad_left=0,
+                      pad_right=0, rows=0, cols=0, **params):
         x_min, y_min, x_max, y_max = denormalize_bbox(bbox, rows, cols)
-        bbox = [x_min + pad_left, y_min + pad_top, x_max + pad_left, y_max + pad_top]
-        return normalize_bbox(bbox, rows + pad_top + pad_bottom, cols + pad_left + pad_right)
+        bbox = [x_min + pad_left, y_min + pad_top, x_max + pad_left,
+                y_max + pad_top]
+        return normalize_bbox(bbox, rows + pad_top + pad_bottom,
+                              cols + pad_left + pad_right)
 
-    def apply_to_keypoint(self, keypoint, pad_top=0, pad_bottom=0, pad_left=0, pad_right=0, **params):
+    def apply_to_keypoint(self, keypoint, pad_top=0, pad_bottom=0, pad_left=0,
+                          pad_right=0, **params):
         x, y, a, s = keypoint
         return [x + pad_left, y + pad_top, a, s]
 
     def get_transform_init_args_names(self):
-        return ("min_height", "min_width", "border_mode", "value", "mask_value")
+        return (
+            "min_height", "min_width", "border_mode", "value", "mask_value")
 
 
 class Crop(DualTransform):
@@ -177,7 +190,8 @@ class Crop(DualTransform):
         uint8, float32
     """
 
-    def __init__(self, x_min=0, y_min=0, x_max=1024, y_max=1024, always_apply=False, p=1.0):
+    def __init__(self, x_min=0, y_min=0, x_max=1024, y_max=1024,
+                 always_apply=False, p=1.0):
         super(Crop, self).__init__(always_apply, p)
         self.x_min = x_min
         self.y_min = y_min
@@ -185,10 +199,12 @@ class Crop(DualTransform):
         self.y_max = y_max
 
     def apply(self, img, **params):
-        return F.crop(img, x_min=self.x_min, y_min=self.y_min, x_max=self.x_max, y_max=self.y_max)
+        return F.crop(img, x_min=self.x_min, y_min=self.y_min,
+                      x_max=self.x_max, y_max=self.y_max)
 
     def apply_to_bbox(self, bbox, **params):
-        return F.bbox_crop(bbox, x_min=self.x_min, y_min=self.y_min, x_max=self.x_max, y_max=self.y_max, **params)
+        return F.bbox_crop(bbox, x_min=self.x_min, y_min=self.y_min,
+                           x_max=self.x_max, y_max=self.y_max, **params)
 
     def apply_to_keypoint(self, keypoint, **params):
         return F.crop_keypoint_by_coords(
@@ -337,13 +353,15 @@ class LongestMaxSize(DualTransform):
         uint8, float32
     """
 
-    def __init__(self, max_size=1024, interpolation=cv2.INTER_LINEAR, always_apply=False, p=1):
+    def __init__(self, max_size=1024, interpolation=cv2.INTER_LINEAR,
+                 always_apply=False, p=1):
         super(LongestMaxSize, self).__init__(always_apply, p)
         self.interpolation = interpolation
         self.max_size = max_size
 
     def apply(self, img, interpolation=cv2.INTER_LINEAR, **params):
-        return F.longest_max_size(img, max_size=self.max_size, interpolation=interpolation)
+        return F.longest_max_size(img, max_size=self.max_size,
+                                  interpolation=interpolation)
 
     def apply_to_bbox(self, bbox, **params):
         # Bounding box coordinates are scale invariant
@@ -375,13 +393,15 @@ class SmallestMaxSize(DualTransform):
         uint8, float32
     """
 
-    def __init__(self, max_size=1024, interpolation=cv2.INTER_LINEAR, always_apply=False, p=1):
+    def __init__(self, max_size=1024, interpolation=cv2.INTER_LINEAR,
+                 always_apply=False, p=1):
         super(SmallestMaxSize, self).__init__(always_apply, p)
         self.interpolation = interpolation
         self.max_size = max_size
 
     def apply(self, img, interpolation=cv2.INTER_LINEAR, **params):
-        return F.smallest_max_size(img, max_size=self.max_size, interpolation=interpolation)
+        return F.smallest_max_size(img, max_size=self.max_size,
+                                   interpolation=interpolation)
 
     def apply_to_bbox(self, bbox, **params):
         return bbox
@@ -415,14 +435,16 @@ class Resize(DualTransform):
         uint8, float32
     """
 
-    def __init__(self, height, width, interpolation=cv2.INTER_LINEAR, always_apply=False, p=1):
+    def __init__(self, height, width, interpolation=cv2.INTER_LINEAR,
+                 always_apply=False, p=1):
         super(Resize, self).__init__(always_apply, p)
         self.height = height
         self.width = width
         self.interpolation = interpolation
 
     def apply(self, img, interpolation=cv2.INTER_LINEAR, **params):
-        return F.resize(img, height=self.height, width=self.width, interpolation=interpolation)
+        return F.resize(img, height=self.height, width=self.width,
+                        interpolation=interpolation)
 
     def apply_to_bbox(self, bbox, **params):
         # Bounding box coordinates are scale invariant
@@ -499,14 +521,14 @@ class Rotate(DualTransform):
     """
 
     def __init__(
-        self,
-        limit=90,
-        interpolation=cv2.INTER_LINEAR,
-        border_mode=cv2.BORDER_REFLECT_101,
-        value=None,
-        mask_value=None,
-        always_apply=False,
-        p=0.5,
+            self,
+            limit=90,
+            interpolation=cv2.INTER_LINEAR,
+            border_mode=cv2.BORDER_REFLECT_101,
+            value=None,
+            mask_value=None,
+            always_apply=False,
+            p=0.5,
     ):
         super(Rotate, self).__init__(always_apply, p)
         self.limit = to_tuple(limit)
@@ -516,10 +538,12 @@ class Rotate(DualTransform):
         self.mask_value = mask_value
 
     def apply(self, img, angle=0, interpolation=cv2.INTER_LINEAR, **params):
-        return F.rotate(img, angle, interpolation, self.border_mode, self.value)
+        return F.rotate(img, angle, interpolation, self.border_mode,
+                        self.value)
 
     def apply_to_mask(self, img, angle=0, **params):
-        return F.rotate(img, angle, cv2.INTER_NEAREST, self.border_mode, self.mask_value)
+        return F.rotate(img, angle, cv2.INTER_NEAREST, self.border_mode,
+                        self.mask_value)
 
     def get_params(self):
         return {"angle": random.uniform(self.limit[0], self.limit[1])}
@@ -552,13 +576,15 @@ class RandomScale(DualTransform):
         uint8, float32
     """
 
-    def __init__(self, scale_limit=0.1, interpolation=cv2.INTER_LINEAR, always_apply=False, p=0.5):
+    def __init__(self, scale_limit=0.1, interpolation=cv2.INTER_LINEAR,
+                 always_apply=False, p=0.5):
         super(RandomScale, self).__init__(always_apply, p)
         self.scale_limit = to_tuple(scale_limit, bias=1.0)
         self.interpolation = interpolation
 
     def get_params(self):
-        return {"scale": random.uniform(self.scale_limit[0], self.scale_limit[1])}
+        return {
+            "scale": random.uniform(self.scale_limit[0], self.scale_limit[1])}
 
     def apply(self, img, scale=0, interpolation=cv2.INTER_LINEAR, **params):
         return F.scale(img, scale, interpolation)
@@ -571,7 +597,8 @@ class RandomScale(DualTransform):
         return F.keypoint_scale(keypoint, scale, scale)
 
     def get_transform_init_args(self):
-        return {"interpolation": self.interpolation, "scale_limit": to_tuple(self.scale_limit, bias=-1.0)}
+        return {"interpolation": self.interpolation,
+                "scale_limit": to_tuple(self.scale_limit, bias=-1.0)}
 
 
 class ShiftScaleRotate(DualTransform):
@@ -605,16 +632,16 @@ class ShiftScaleRotate(DualTransform):
     """
 
     def __init__(
-        self,
-        shift_limit=0.0625,
-        scale_limit=0.1,
-        rotate_limit=45,
-        interpolation=cv2.INTER_LINEAR,
-        border_mode=cv2.BORDER_REFLECT_101,
-        value=None,
-        mask_value=None,
-        always_apply=False,
-        p=0.5,
+            self,
+            shift_limit=0.0625,
+            scale_limit=0.1,
+            rotate_limit=45,
+            interpolation=cv2.INTER_LINEAR,
+            border_mode=cv2.BORDER_REFLECT_101,
+            value=None,
+            mask_value=None,
+            always_apply=False,
+            p=0.5,
     ):
         super(ShiftScaleRotate, self).__init__(always_apply, p)
         self.shift_limit = to_tuple(shift_limit)
@@ -625,27 +652,38 @@ class ShiftScaleRotate(DualTransform):
         self.value = value
         self.mask_value = mask_value
 
-    def apply(self, img, angle=0, scale=0, dx=0, dy=0, interpolation=cv2.INTER_LINEAR, **params):
-        return F.shift_scale_rotate(img, angle, scale, dx, dy, interpolation, self.border_mode, self.value)
+    def apply(self, img, angle=0, scale=0, dx=0, dy=0,
+              interpolation=cv2.INTER_LINEAR, rows=0, cols=0, **params):
 
-    def apply_to_mask(self, img, angle=0, scale=0, dx=0, dy=0, **params):
-        return F.shift_scale_rotate(img, angle, scale, dx, dy, cv2.INTER_NEAREST, self.border_mode, self.mask_value)
+        return F.shift_scale_rotate(img, angle, scale, dx, dy, interpolation,
+                                    self.border_mode, self.value, height=cols, width=rows)
+
+    def apply_to_mask(self, img, angle=0, scale=0, dx=0, dy=0, rows=0, cols=0, **params):
+        return F.shift_scale_rotate(img, angle, scale, dx, dy,
+                                    cv2.INTER_NEAREST, self.border_mode,
+                                    self.mask_value, height=cols, width=rows)
 
     def apply_to_keypoint(
-        self, keypoint, angle=0, scale=0, dx=0, dy=0, rows=0, cols=0, interpolation=cv2.INTER_LINEAR, **params
+            self, keypoint, angle=0, scale=0, dx=0, dy=0, rows=0, cols=0,
+            interpolation=cv2.INTER_LINEAR, **params
     ):
-        return F.keypoint_shift_scale_rotate(keypoint, angle, scale, dx, dy, rows, cols)
+        return F.keypoint_shift_scale_rotate(keypoint, angle, scale, dx, dy,
+                                             rows, cols)
 
     def get_params(self):
         return {
-            "angle": random.uniform(self.rotate_limit[0], self.rotate_limit[1]),
+            "angle": random.uniform(self.rotate_limit[0],
+                                    self.rotate_limit[1]),
             "scale": random.uniform(self.scale_limit[0], self.scale_limit[1]),
             "dx": random.uniform(self.shift_limit[0], self.shift_limit[1]),
             "dy": random.uniform(self.shift_limit[0], self.shift_limit[1]),
         }
 
-    def apply_to_bbox(self, bbox, angle, scale, dx, dy, interpolation=cv2.INTER_LINEAR, **params):
-        return F.bbox_shift_scale_rotate(bbox, angle, scale, dx, dy, interpolation=cv2.INTER_LINEAR, **params)
+    def apply_to_bbox(self, bbox, angle, scale, dx, dy,
+                      interpolation=cv2.INTER_LINEAR, **params):
+        return F.bbox_shift_scale_rotate(bbox, angle, scale, dx, dy,
+                                         interpolation=cv2.INTER_LINEAR,
+                                         **params)
 
     def get_transform_init_args(self):
         return {
@@ -691,7 +729,8 @@ class CenterCrop(DualTransform):
         return F.bbox_center_crop(bbox, self.height, self.width, **params)
 
     def apply_to_keypoint(self, keypoint, **params):
-        return F.keypoint_center_crop(keypoint, self.height, self.width, **params)
+        return F.keypoint_center_crop(keypoint, self.height, self.width,
+                                      **params)
 
     def get_transform_init_args_names(self):
         return ("height", "width")
@@ -727,7 +766,8 @@ class RandomCrop(DualTransform):
         return F.bbox_random_crop(bbox, self.height, self.width, **params)
 
     def apply_to_keypoint(self, keypoint, **params):
-        return F.keypoint_random_crop(keypoint, self.height, self.width, **params)
+        return F.keypoint_random_crop(keypoint, self.height, self.width,
+                                      **params)
 
     def get_transform_init_args_names(self):
         return ("height", "width")
@@ -767,12 +807,15 @@ class RandomCropNearBBox(DualTransform):
 
         return {"x_min": x_min, "x_max": x_max, "y_min": y_min, "y_max": y_max}
 
-    def apply_to_bbox(self, bbox, x_min=0, x_max=0, y_min=0, y_max=0, **params):
+    def apply_to_bbox(self, bbox, x_min=0, x_max=0, y_min=0, y_max=0,
+                      **params):
         h_start = y_min
         w_start = x_min
-        return F.bbox_crop(bbox, y_max - y_min, x_max - x_min, h_start, w_start, **params)
+        return F.bbox_crop(bbox, y_max - y_min, x_max - x_min, h_start,
+                           w_start, **params)
 
-    def apply_to_keypoint(self, keypoint, x_min=0, x_max=0, y_min=0, y_max=0, **params):
+    def apply_to_keypoint(self, keypoint, x_min=0, x_max=0, y_min=0, y_max=0,
+                          **params):
         return F.crop_keypoint_by_coords(
             keypoint,
             crop_coords=[x_min, y_min, x_max, y_max],
@@ -793,21 +836,27 @@ class RandomCropNearBBox(DualTransform):
 class _BaseRandomSizedCrop(DualTransform):
     # Base class for RandomSizedCrop and RandomResizedCrop
 
-    def __init__(self, height, width, interpolation=cv2.INTER_LINEAR, always_apply=False, p=1.0):
+    def __init__(self, height, width, interpolation=cv2.INTER_LINEAR,
+                 always_apply=False, p=1.0):
         super(_BaseRandomSizedCrop, self).__init__(always_apply, p)
         self.height = height
         self.width = width
         self.interpolation = interpolation
 
-    def apply(self, img, crop_height=0, crop_width=0, h_start=0, w_start=0, interpolation=cv2.INTER_LINEAR, **params):
-        crop = F.random_crop(img, crop_height, crop_width, h_start, w_start)
+    def apply(self, img, crop_height=0, crop_width=0, h_start=0, w_start=0,
+              interpolation=cv2.INTER_LINEAR, rows=0, cols=0, **params):
+        crop = F.random_crop(img, crop_height, crop_width, h_start, w_start, height=cols, width=rows)
         return F.resize(crop, self.height, self.width, interpolation)
 
-    def apply_to_bbox(self, bbox, crop_height=0, crop_width=0, h_start=0, w_start=0, rows=0, cols=0, **params):
-        return F.bbox_random_crop(bbox, crop_height, crop_width, h_start, w_start, rows, cols)
+    def apply_to_bbox(self, bbox, crop_height=0, crop_width=0, h_start=0,
+                      w_start=0, rows=0, cols=0, **params):
+        return F.bbox_random_crop(bbox, crop_height, crop_width, h_start,
+                                  w_start, rows, cols)
 
-    def apply_to_keypoint(self, keypoint, crop_height=0, crop_width=0, h_start=0, w_start=0, rows=0, cols=0, **params):
-        keypoint = F.keypoint_random_crop(keypoint, crop_height, crop_width, h_start, w_start, rows, cols)
+    def apply_to_keypoint(self, keypoint, crop_height=0, crop_width=0,
+                          h_start=0, w_start=0, rows=0, cols=0, **params):
+        keypoint = F.keypoint_random_crop(keypoint, crop_height, crop_width,
+                                          h_start, w_start, rows, cols)
         scale_x = self.width / crop_width
         scale_y = self.height / crop_height
         keypoint = F.keypoint_scale(keypoint, scale_x, scale_y)
@@ -835,16 +884,19 @@ class RandomSizedCrop(_BaseRandomSizedCrop):
     """
 
     def __init__(
-        self, min_max_height, height, width, w2h_ratio=1.0, interpolation=cv2.INTER_LINEAR, always_apply=False, p=1.0
+            self, min_max_height, height, width, w2h_ratio=1.0,
+            interpolation=cv2.INTER_LINEAR, always_apply=False, p=1.0
     ):
         super(RandomSizedCrop, self).__init__(
-            height=height, width=width, interpolation=interpolation, always_apply=always_apply, p=p
+            height=height, width=width, interpolation=interpolation,
+            always_apply=always_apply, p=p
         )
         self.min_max_height = min_max_height
         self.w2h_ratio = w2h_ratio
 
     def get_params(self):
-        crop_height = random.randint(self.min_max_height[0], self.min_max_height[1])
+        crop_height = random.randint(self.min_max_height[0],
+                                     self.min_max_height[1])
         return {
             "h_start": random.random(),
             "w_start": random.random(),
@@ -877,18 +929,19 @@ class RandomResizedCrop(_BaseRandomSizedCrop):
     """
 
     def __init__(
-        self,
-        height,
-        width,
-        scale=(0.08, 1.0),
-        ratio=(0.75, 1.3333333333333333),
-        interpolation=cv2.INTER_LINEAR,
-        always_apply=False,
-        p=1.0,
+            self,
+            height,
+            width,
+            scale=(0.08, 1.0),
+            ratio=(0.75, 1.3333333333333333),
+            interpolation=cv2.INTER_LINEAR,
+            always_apply=False,
+            p=1.0,
     ):
 
         super(RandomResizedCrop, self).__init__(
-            height=height, width=width, interpolation=interpolation, always_apply=always_apply, p=p
+            height=height, width=width, interpolation=interpolation,
+            always_apply=always_apply, p=p
         )
         self.scale = scale
         self.ratio = ratio
@@ -965,22 +1018,26 @@ class RandomSizedBBoxSafeCrop(DualTransform):
         uint8, float32
     """
 
-    def __init__(self, height, width, erosion_rate=0.0, interpolation=cv2.INTER_LINEAR, always_apply=False, p=1.0):
+    def __init__(self, height, width, erosion_rate=0.0,
+                 interpolation=cv2.INTER_LINEAR, always_apply=False, p=1.0):
         super(RandomSizedBBoxSafeCrop, self).__init__(always_apply, p)
         self.height = height
         self.width = width
         self.interpolation = interpolation
         self.erosion_rate = erosion_rate
 
-    def apply(self, img, crop_height=0, crop_width=0, h_start=0, w_start=0, interpolation=cv2.INTER_LINEAR, **params):
+    def apply(self, img, crop_height=0, crop_width=0, h_start=0, w_start=0,
+              interpolation=cv2.INTER_LINEAR, **params):
         crop = F.random_crop(img, crop_height, crop_width, h_start, w_start)
         return F.resize(crop, self.height, self.width, interpolation)
 
     def get_params_dependent_on_targets(self, params):
         img_h, img_w = params["image"].shape[:2]
-        if len(params["bboxes"]) == 0:  # less likely, this class is for use with bboxes.
+        if len(params[
+                   "bboxes"]) == 0:  # less likely, this class is for use with bboxes.
             erosive_h = int(img_h * (1.0 - self.erosion_rate))
-            crop_height = img_h if erosive_h >= img_h else random.randint(erosive_h, img_h)
+            crop_height = img_h if erosive_h >= img_h else random.randint(
+                erosive_h, img_h)
             return {
                 "h_start": random.random(),
                 "w_start": random.random(),
@@ -989,19 +1046,24 @@ class RandomSizedBBoxSafeCrop(DualTransform):
             }
         # get union of all bboxes
         x, y, x2, y2 = union_of_bboxes(
-            width=img_w, height=img_h, bboxes=params["bboxes"], erosion_rate=self.erosion_rate
+            width=img_w, height=img_h, bboxes=params["bboxes"],
+            erosion_rate=self.erosion_rate
         )
         # find bigger region
         bx, by = x * random.random(), y * random.random()
-        bx2, by2 = x2 + (1 - x2) * random.random(), y2 + (1 - y2) * random.random()
+        bx2, by2 = x2 + (1 - x2) * random.random(), y2 + (
+                1 - y2) * random.random()
         bw, bh = bx2 - bx, by2 - by
         crop_height, crop_width = int(img_h * bh), int(img_w * bw)
         h_start = np.clip(0.0 if bh >= 1.0 else by / (1.0 - bh), 0.0, 1.0)
         w_start = np.clip(0.0 if bw >= 1.0 else bx / (1.0 - bw), 0.0, 1.0)
-        return {"h_start": h_start, "w_start": w_start, "crop_height": crop_height, "crop_width": crop_width}
+        return {"h_start": h_start, "w_start": w_start,
+                "crop_height": crop_height, "crop_width": crop_width}
 
-    def apply_to_bbox(self, bbox, crop_height=0, crop_width=0, h_start=0, w_start=0, rows=0, cols=0, **params):
-        return F.bbox_random_crop(bbox, crop_height, crop_width, h_start, w_start, rows, cols)
+    def apply_to_bbox(self, bbox, crop_height=0, crop_width=0, h_start=0,
+                      w_start=0, rows=0, cols=0, **params):
+        return F.bbox_random_crop(bbox, crop_height, crop_width, h_start,
+                                  w_start, rows, cols)
 
     @property
     def targets_as_params(self):
@@ -1030,13 +1092,19 @@ class CropNonEmptyMaskIfExists(DualTransform):
         uint8, float32
     """
 
-    def __init__(self, height, width, ignore_values=None, ignore_channels=None, always_apply=False, p=1.0):
+    def __init__(self, height, width, ignore_values=None, ignore_channels=None,
+                 always_apply=False, p=1.0):
         super(CropNonEmptyMaskIfExists, self).__init__(always_apply, p)
 
         if ignore_values is not None and not isinstance(ignore_values, list):
-            raise ValueError("Expected `ignore_values` of type `list`, got `{}`".format(type(ignore_values)))
-        if ignore_channels is not None and not isinstance(ignore_channels, list):
-            raise ValueError("Expected `ignore_channels` of type `list`, got `{}`".format(type(ignore_channels)))
+            raise ValueError(
+                "Expected `ignore_values` of type `list`, got `{}`".format(
+                    type(ignore_values)))
+        if ignore_channels is not None and not isinstance(ignore_channels,
+                                                          list):
+            raise ValueError(
+                "Expected `ignore_channels` of type `list`, got `{}`".format(
+                    type(ignore_channels)))
 
         self.height = height
         self.width = width
@@ -1046,12 +1114,15 @@ class CropNonEmptyMaskIfExists(DualTransform):
     def apply(self, img, x_min=0, x_max=0, y_min=0, y_max=0, **params):
         return F.crop(img, x_min, y_min, x_max, y_max)
 
-    def apply_to_bbox(self, bbox, x_min=0, x_max=0, y_min=0, y_max=0, **params):
+    def apply_to_bbox(self, bbox, x_min=0, x_max=0, y_min=0, y_max=0,
+                      **params):
         return F.bbox_crop(
-            bbox, x_min=x_min, x_max=x_max, y_min=y_min, y_max=y_max, rows=params["rows"], cols=params["cols"]
+            bbox, x_min=x_min, x_max=x_max, y_min=y_min, y_max=y_max,
+            rows=params["rows"], cols=params["cols"]
         )
 
-    def apply_to_keypoint(self, keypoint, x_min=0, x_max=0, y_min=0, y_max=0, **params):
+    def apply_to_keypoint(self, keypoint, x_min=0, x_max=0, y_min=0, y_max=0,
+                          **params):
         return F.crop_keypoint_by_coords(
             keypoint,
             crop_coords=[x_min, y_min, x_max, y_max],
@@ -1074,7 +1145,8 @@ class CropNonEmptyMaskIfExists(DualTransform):
             mask = np.where(np.isin(mask, ignore_values_np), 0, mask)
 
         if mask.ndim == 3 and self.ignore_channels is not None:
-            target_channels = np.array([ch for ch in range(mask.shape[-1]) if ch not in self.ignore_channels])
+            target_channels = np.array([ch for ch in range(mask.shape[-1]) if
+                                        ch not in self.ignore_channels])
             mask = np.take(mask, target_channels, axis=-1)
 
         if self.height > mask_height or self.width > mask_width:
@@ -1131,15 +1203,15 @@ class OpticalDistortion(DualTransform):
     """
 
     def __init__(
-        self,
-        distort_limit=0.05,
-        shift_limit=0.05,
-        interpolation=cv2.INTER_LINEAR,
-        border_mode=cv2.BORDER_REFLECT_101,
-        value=None,
-        mask_value=None,
-        always_apply=False,
-        p=0.5,
+            self,
+            distort_limit=0.05,
+            shift_limit=0.05,
+            interpolation=cv2.INTER_LINEAR,
+            border_mode=cv2.BORDER_REFLECT_101,
+            value=None,
+            mask_value=None,
+            always_apply=False,
+            p=0.5,
     ):
         super(OpticalDistortion, self).__init__(always_apply, p)
         self.shift_limit = to_tuple(shift_limit)
@@ -1149,21 +1221,27 @@ class OpticalDistortion(DualTransform):
         self.value = value
         self.mask_value = mask_value
 
-    def apply(self, img, k=0, dx=0, dy=0, interpolation=cv2.INTER_LINEAR, **params):
-        return F.optical_distortion(img, k, dx, dy, interpolation, self.border_mode, self.value)
+    def apply(self, img, k=0, dx=0, dy=0, interpolation=cv2.INTER_LINEAR,
+              **params):
+        return F.optical_distortion(img, k, dx, dy, interpolation,
+                                    self.border_mode, self.value)
 
     def apply_to_mask(self, img, k=0, dx=0, dy=0, **params):
-        return F.optical_distortion(img, k, dx, dy, cv2.INTER_NEAREST, self.border_mode, self.mask_value)
+        return F.optical_distortion(img, k, dx, dy, cv2.INTER_NEAREST,
+                                    self.border_mode, self.mask_value)
 
     def get_params(self):
         return {
             "k": random.uniform(self.distort_limit[0], self.distort_limit[1]),
-            "dx": round(random.uniform(self.shift_limit[0], self.shift_limit[1])),
-            "dy": round(random.uniform(self.shift_limit[0], self.shift_limit[1])),
+            "dx": round(
+                random.uniform(self.shift_limit[0], self.shift_limit[1])),
+            "dy": round(
+                random.uniform(self.shift_limit[0], self.shift_limit[1])),
         }
 
     def get_transform_init_args_names(self):
-        return ("distort_limit", "shift_limit", "interpolation", "border_mode", "value", "mask_value")
+        return ("distort_limit", "shift_limit", "interpolation", "border_mode",
+                "value", "mask_value")
 
 
 class GridDistortion(DualTransform):
@@ -1191,15 +1269,15 @@ class GridDistortion(DualTransform):
     """
 
     def __init__(
-        self,
-        num_steps=5,
-        distort_limit=0.3,
-        interpolation=cv2.INTER_LINEAR,
-        border_mode=cv2.BORDER_REFLECT_101,
-        value=None,
-        mask_value=None,
-        always_apply=False,
-        p=0.5,
+            self,
+            num_steps=5,
+            distort_limit=0.3,
+            interpolation=cv2.INTER_LINEAR,
+            border_mode=cv2.BORDER_REFLECT_101,
+            value=None,
+            mask_value=None,
+            always_apply=False,
+            p=0.5,
     ):
         super(GridDistortion, self).__init__(always_apply, p)
         self.num_steps = num_steps
@@ -1209,21 +1287,31 @@ class GridDistortion(DualTransform):
         self.value = value
         self.mask_value = mask_value
 
-    def apply(self, img, stepsx=[], stepsy=[], interpolation=cv2.INTER_LINEAR, **params):
-        return F.grid_distortion(img, self.num_steps, stepsx, stepsy, interpolation, self.border_mode, self.value)
+    def apply(self, img, stepsx=[], stepsy=[], interpolation=cv2.INTER_LINEAR,
+              **params):
+        return F.grid_distortion(img, self.num_steps, stepsx, stepsy,
+                                 interpolation, self.border_mode, self.value)
 
     def apply_to_mask(self, img, stepsx=[], stepsy=[], **params):
         return F.grid_distortion(
-            img, self.num_steps, stepsx, stepsy, cv2.INTER_NEAREST, self.border_mode, self.mask_value
+            img, self.num_steps, stepsx, stepsy, cv2.INTER_NEAREST,
+            self.border_mode, self.mask_value
         )
 
     def get_params(self):
-        stepsx = [1 + random.uniform(self.distort_limit[0], self.distort_limit[1]) for i in range(self.num_steps + 1)]
-        stepsy = [1 + random.uniform(self.distort_limit[0], self.distort_limit[1]) for i in range(self.num_steps + 1)]
+        stepsx = [
+            1 + random.uniform(self.distort_limit[0], self.distort_limit[1])
+            for i in range(self.num_steps + 1)]
+        stepsy = [
+            1 + random.uniform(self.distort_limit[0], self.distort_limit[1])
+            for i in range(self.num_steps + 1)]
         return {"stepsx": stepsx, "stepsy": stepsy}
 
     def get_transform_init_args_names(self):
-        return ("num_steps", "distort_limit", "interpolation", "border_mode", "value", "mask_value")
+        return (
+            "num_steps", "distort_limit", "interpolation", "border_mode",
+            "value",
+            "mask_value")
 
 
 class ElasticTransform(DualTransform):
@@ -1260,17 +1348,17 @@ class ElasticTransform(DualTransform):
     """
 
     def __init__(
-        self,
-        alpha=1,
-        sigma=50,
-        alpha_affine=50,
-        interpolation=cv2.INTER_LINEAR,
-        border_mode=cv2.BORDER_REFLECT_101,
-        value=None,
-        mask_value=None,
-        always_apply=False,
-        approximate=False,
-        p=0.5,
+            self,
+            alpha=1,
+            sigma=50,
+            alpha_affine=50,
+            interpolation=cv2.INTER_LINEAR,
+            border_mode=cv2.BORDER_REFLECT_101,
+            value=None,
+            mask_value=None,
+            always_apply=False,
+            approximate=False,
+            p=0.5,
     ):
         super(ElasticTransform, self).__init__(always_apply, p)
         self.alpha = alpha
@@ -1282,7 +1370,8 @@ class ElasticTransform(DualTransform):
         self.mask_value = mask_value
         self.approximate = approximate
 
-    def apply(self, img, random_state=None, interpolation=cv2.INTER_LINEAR, **params):
+    def apply(self, img, random_state=None, interpolation=cv2.INTER_LINEAR,
+              **params):
         return F.elastic_transform(
             img,
             self.alpha,
@@ -1312,7 +1401,9 @@ class ElasticTransform(DualTransform):
         return {"random_state": random.randint(0, 10000)}
 
     def get_transform_init_args_names(self):
-        return ("alpha", "sigma", "alpha_affine", "interpolation", "border_mode", "value", "mask_value", "approximate")
+        return (
+            "alpha", "sigma", "alpha_affine", "interpolation", "border_mode",
+            "value", "mask_value", "approximate")
 
 
 class RandomGridShuffle(DualTransform):
@@ -1350,17 +1441,21 @@ class RandomGridShuffle(DualTransform):
         n, m = self.grid
 
         if n <= 0 or m <= 0:
-            raise ValueError("Grid's values must be positive. Current grid [%s, %s]" % (n, m))
+            raise ValueError(
+                "Grid's values must be positive. Current grid [%s, %s]" % (
+                    n, m))
 
         if n > height // 2 or m > width // 2:
-            raise ValueError("Incorrect size cell of grid. Just shuffle pixels of image")
+            raise ValueError(
+                "Incorrect size cell of grid. Just shuffle pixels of image")
 
         random_state = np.random.RandomState(random.randint(0, 10000))
 
         height_split = np.linspace(0, height, n + 1, dtype=np.int)
         width_split = np.linspace(0, width, m + 1, dtype=np.int)
 
-        height_matrix, width_matrix = np.meshgrid(height_split, width_split, indexing="ij")
+        height_matrix, width_matrix = np.meshgrid(height_split, width_split,
+                                                  indexing="ij")
 
         index_height_matrix = height_matrix[:-1, :-1]
         index_width_matrix = width_matrix[:-1, :-1]
@@ -1378,12 +1473,15 @@ class RandomGridShuffle(DualTransform):
 
         for bbox_size in np.unique(tiles_sizes.reshape(-1, 2), axis=0):
             eq_mat = np.all(tiles_sizes == bbox_size, axis=2)
-            new_index_matrix[eq_mat] = random_state.permutation(new_index_matrix[eq_mat])
+            new_index_matrix[eq_mat] = random_state.permutation(
+                new_index_matrix[eq_mat])
 
         new_index_matrix = np.split(new_index_matrix, 2, axis=2)
 
-        old_x = index_height_matrix[new_index_matrix[0], new_index_matrix[1]].reshape(-1)
-        old_y = index_width_matrix[new_index_matrix[0], new_index_matrix[1]].reshape(-1)
+        old_x = index_height_matrix[
+            new_index_matrix[0], new_index_matrix[1]].reshape(-1)
+        old_y = index_width_matrix[
+            new_index_matrix[0], new_index_matrix[1]].reshape(-1)
 
         shift_x = height_tile_sizes.reshape(-1)
         shift_y = width_tile_sizes.reshape(-1)
@@ -1391,7 +1489,8 @@ class RandomGridShuffle(DualTransform):
         curr_x = index_height_matrix.reshape(-1)
         curr_y = index_width_matrix.reshape(-1)
 
-        tiles = np.stack([curr_x, curr_y, old_x, old_y, shift_x, shift_y], axis=1)
+        tiles = np.stack([curr_x, curr_y, old_x, old_y, shift_x, shift_y],
+                         axis=1)
 
         return {"tiles": tiles}
 
@@ -1419,7 +1518,8 @@ class Normalize(ImageOnlyTransform):
     """
 
     def __init__(
-        self, mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225), max_pixel_value=255.0, always_apply=False, p=1.0
+            self, mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225),
+            max_pixel_value=255.0, always_apply=False, p=1.0
     ):
         super(Normalize, self).__init__(always_apply, p)
         self.mean = mean
@@ -1454,13 +1554,16 @@ class Cutout(ImageOnlyTransform):
     |  https://github.com/aleju/imgaug/blob/master/imgaug/augmenters/arithmetic.py
     """
 
-    def __init__(self, num_holes=8, max_h_size=8, max_w_size=8, fill_value=0, always_apply=False, p=0.5):
+    def __init__(self, num_holes=8, max_h_size=8, max_w_size=8, fill_value=0,
+                 always_apply=False, p=0.5):
         super(Cutout, self).__init__(always_apply, p)
         self.num_holes = num_holes
         self.max_h_size = max_h_size
         self.max_w_size = max_w_size
         self.fill_value = fill_value
-        warnings.warn("This class has been deprecated. Please use CoarseDropout", DeprecationWarning)
+        warnings.warn(
+            "This class has been deprecated. Please use CoarseDropout",
+            DeprecationWarning)
 
     def apply(self, image, fill_value=0, holes=[], **params):
         return F.cutout(image, holes, fill_value)
@@ -1519,16 +1622,16 @@ class CoarseDropout(ImageOnlyTransform):
     """
 
     def __init__(
-        self,
-        max_holes=8,
-        max_height=8,
-        max_width=8,
-        min_holes=None,
-        min_height=None,
-        min_width=None,
-        fill_value=0,
-        always_apply=False,
-        p=0.5,
+            self,
+            max_holes=8,
+            max_height=8,
+            max_width=8,
+            min_holes=None,
+            min_height=None,
+            min_width=None,
+            fill_value=0,
+            always_apply=False,
+            p=0.5,
     ):
         super(CoarseDropout, self).__init__(always_apply, p)
         self.max_holes = max_holes
@@ -1567,7 +1670,9 @@ class CoarseDropout(ImageOnlyTransform):
         return ["image"]
 
     def get_transform_init_args_names(self):
-        return ("max_holes", "max_height", "max_width", "min_holes", "min_height", "min_width")
+        return (
+            "max_holes", "max_height", "max_width", "min_holes", "min_height",
+            "min_width")
 
 
 class ImageCompression(ImageOnlyTransform):
@@ -1593,12 +1698,12 @@ class ImageCompression(ImageOnlyTransform):
         WEBP = 1
 
     def __init__(
-        self,
-        quality_lower=99,
-        quality_upper=100,
-        compression_type=ImageCompressionType.JPEG,
-        always_apply=False,
-        p=0.5,
+            self,
+            quality_lower=99,
+            quality_upper=100,
+            compression_type=ImageCompressionType.JPEG,
+            always_apply=False,
+            p=0.5,
     ):
         super(ImageCompression, self).__init__(always_apply, p)
 
@@ -1623,7 +1728,9 @@ class ImageCompression(ImageOnlyTransform):
         if self.compression_type == ImageCompression.ImageCompressionType.WEBP:
             image_type = ".webp"
 
-        return {"quality": random.randint(self.quality_lower, self.quality_upper), "image_type": image_type}
+        return {
+            "quality": random.randint(self.quality_lower, self.quality_upper),
+            "image_type": image_type}
 
     def get_transform_init_args_names(self):
         return ("quality_lower", "quality_upper", "compression_type")
@@ -1643,7 +1750,8 @@ class JpegCompression(ImageCompression):
         uint8, float32
     """
 
-    def __init__(self, quality_lower=99, quality_upper=100, always_apply=False, p=0.5):
+    def __init__(self, quality_lower=99, quality_upper=100, always_apply=False,
+                 p=0.5):
         super(JpegCompression, self).__init__(
             quality_lower=quality_lower,
             quality_upper=quality_upper,
@@ -1651,10 +1759,13 @@ class JpegCompression(ImageCompression):
             always_apply=always_apply,
             p=p,
         )
-        warnings.warn("This class has been deprecated. Please use ImageCompression", DeprecationWarning)
+        warnings.warn(
+            "This class has been deprecated. Please use ImageCompression",
+            DeprecationWarning)
 
     def get_transform_init_args(self):
-        return {"quality_lower": self.quality_lower, "quality_upper": self.quality_upper}
+        return {"quality_lower": self.quality_lower,
+                "quality_upper": self.quality_upper}
 
 
 class RandomSnow(ImageOnlyTransform):
@@ -1674,7 +1785,8 @@ class RandomSnow(ImageOnlyTransform):
         uint8, float32
     """
 
-    def __init__(self, snow_point_lower=0.1, snow_point_upper=0.3, brightness_coeff=2.5, always_apply=False, p=0.5):
+    def __init__(self, snow_point_lower=0.1, snow_point_upper=0.3,
+                 brightness_coeff=2.5, always_apply=False, p=0.5):
         super(RandomSnow, self).__init__(always_apply, p)
 
         assert 0 <= snow_point_lower <= snow_point_upper <= 1
@@ -1688,7 +1800,8 @@ class RandomSnow(ImageOnlyTransform):
         return F.add_snow(image, snow_point, self.brightness_coeff)
 
     def get_params(self):
-        return {"snow_point": random.uniform(self.snow_point_lower, self.snow_point_upper)}
+        return {"snow_point": random.uniform(self.snow_point_lower,
+                                             self.snow_point_upper)}
 
     def get_transform_init_args_names(self):
         return ("snow_point_lower", "snow_point_upper", "brightness_coeff")
@@ -1718,17 +1831,17 @@ class RandomRain(ImageOnlyTransform):
     """
 
     def __init__(
-        self,
-        slant_lower=-10,
-        slant_upper=10,
-        drop_length=20,
-        drop_width=1,
-        drop_color=(200, 200, 200),
-        blur_value=7,
-        brightness_coefficient=0.7,
-        rain_type=None,
-        always_apply=False,
-        p=0.5,
+            self,
+            slant_lower=-10,
+            slant_upper=10,
+            drop_length=20,
+            drop_width=1,
+            drop_color=(200, 200, 200),
+            blur_value=7,
+            brightness_coefficient=0.7,
+            rain_type=None,
+            always_apply=False,
+            p=0.5,
     ):
         super(RandomRain, self).__init__(always_apply, p)
 
@@ -1787,7 +1900,8 @@ class RandomRain(ImageOnlyTransform):
 
         rain_drops = []
 
-        for _i in range(num_drops):  # If You want heavy rain, try increasing this
+        for _i in range(
+                num_drops):  # If You want heavy rain, try increasing this
             if slant < 0:
                 x = random.randint(slant, width)
             else:
@@ -1829,7 +1943,8 @@ class RandomFog(ImageOnlyTransform):
         uint8, float32
     """
 
-    def __init__(self, fog_coef_lower=0.3, fog_coef_upper=1, alpha_coef=0.08, always_apply=False, p=0.5):
+    def __init__(self, fog_coef_lower=0.3, fog_coef_upper=1, alpha_coef=0.08,
+                 always_apply=False, p=0.5):
         super(RandomFog, self).__init__(always_apply, p)
 
         assert 0 <= fog_coef_lower <= fog_coef_upper <= 1
@@ -1900,20 +2015,21 @@ class RandomSunFlare(ImageOnlyTransform):
     """
 
     def __init__(
-        self,
-        flare_roi=(0, 0, 1, 0.5),
-        angle_lower=0,
-        angle_upper=1,
-        num_flare_circles_lower=6,
-        num_flare_circles_upper=10,
-        src_radius=400,
-        src_color=(255, 255, 255),
-        always_apply=False,
-        p=0.5,
+            self,
+            flare_roi=(0, 0, 1, 0.5),
+            angle_lower=0,
+            angle_upper=1,
+            num_flare_circles_lower=6,
+            num_flare_circles_upper=10,
+            src_radius=400,
+            src_color=(255, 255, 255),
+            always_apply=False,
+            p=0.5,
     ):
         super(RandomSunFlare, self).__init__(always_apply, p)
 
-        (flare_center_lower_x, flare_center_lower_y, flare_center_upper_x, flare_center_upper_y) = flare_roi
+        (flare_center_lower_x, flare_center_lower_y, flare_center_upper_x,
+         flare_center_upper_y) = flare_roi
 
         assert 0 <= flare_center_lower_x < flare_center_upper_x <= 1
         assert 0 <= flare_center_lower_y < flare_center_upper_y <= 1
@@ -1934,9 +2050,11 @@ class RandomSunFlare(ImageOnlyTransform):
         self.src_radius = src_radius
         self.src_color = src_color
 
-    def apply(self, image, flare_center_x=0.5, flare_center_y=0.5, circles=[], **params):
+    def apply(self, image, flare_center_x=0.5, flare_center_y=0.5, circles=[],
+              **params):
 
-        return F.add_sun_flare(image, flare_center_x, flare_center_y, self.src_radius, self.src_color, circles)
+        return F.add_sun_flare(image, flare_center_x, flare_center_y,
+                               self.src_radius, self.src_color, circles)
 
     @property
     def targets_as_params(self):
@@ -1946,15 +2064,19 @@ class RandomSunFlare(ImageOnlyTransform):
         img = params["image"]
         height, width = img.shape[:2]
 
-        angle = 2 * math.pi * random.uniform(self.angle_lower, self.angle_upper)
+        angle = 2 * math.pi * random.uniform(self.angle_lower,
+                                             self.angle_upper)
 
-        flare_center_x = random.uniform(self.flare_center_lower_x, self.flare_center_upper_x)
-        flare_center_y = random.uniform(self.flare_center_lower_y, self.flare_center_upper_y)
+        flare_center_x = random.uniform(self.flare_center_lower_x,
+                                        self.flare_center_upper_x)
+        flare_center_y = random.uniform(self.flare_center_lower_y,
+                                        self.flare_center_upper_y)
 
         flare_center_x = int(width * flare_center_x)
         flare_center_y = int(height * flare_center_y)
 
-        num_circles = random.randint(self.num_flare_circles_lower, self.num_flare_circles_upper)
+        num_circles = random.randint(self.num_flare_circles_lower,
+                                     self.num_flare_circles_upper)
 
         circles = []
 
@@ -1962,7 +2084,8 @@ class RandomSunFlare(ImageOnlyTransform):
         y = []
 
         for rand_x in range(0, width, 10):
-            rand_y = math.tan(angle) * (rand_x - flare_center_x) + flare_center_y
+            rand_y = math.tan(angle) * (
+                    rand_x - flare_center_x) + flare_center_y
             x.append(rand_x)
             y.append(2 * flare_center_y - rand_y)
 
@@ -1971,13 +2094,18 @@ class RandomSunFlare(ImageOnlyTransform):
             r = random.randint(0, len(x) - 1)
             rad = random.randint(1, max(height // 100 - 2, 2))
 
-            r_color = random.randint(max(self.src_color[0] - 50, 0), self.src_color[0])
-            g_color = random.randint(max(self.src_color[0] - 50, 0), self.src_color[0])
-            b_color = random.randint(max(self.src_color[0] - 50, 0), self.src_color[0])
+            r_color = random.randint(max(self.src_color[0] - 50, 0),
+                                     self.src_color[0])
+            g_color = random.randint(max(self.src_color[0] - 50, 0),
+                                     self.src_color[0])
+            b_color = random.randint(max(self.src_color[0] - 50, 0),
+                                     self.src_color[0])
 
-            circles += [(alpha, (int(x[r]), int(y[r])), pow(rad, 3), (r_color, g_color, b_color))]
+            circles += [(alpha, (int(x[r]), int(y[r])), pow(rad, 3),
+                         (r_color, g_color, b_color))]
 
-        return {"circles": circles, "flare_center_x": flare_center_x, "flare_center_y": flare_center_y}
+        return {"circles": circles, "flare_center_x": flare_center_x,
+                "flare_center_y": flare_center_y}
 
     def get_transform_init_args(self):
         return {
@@ -2018,17 +2146,18 @@ class RandomShadow(ImageOnlyTransform):
     """
 
     def __init__(
-        self,
-        shadow_roi=(0, 0.5, 1, 1),
-        num_shadows_lower=1,
-        num_shadows_upper=2,
-        shadow_dimension=5,
-        always_apply=False,
-        p=0.5,
+            self,
+            shadow_roi=(0, 0.5, 1, 1),
+            num_shadows_lower=1,
+            num_shadows_upper=2,
+            shadow_dimension=5,
+            always_apply=False,
+            p=0.5,
     ):
         super(RandomShadow, self).__init__(always_apply, p)
 
-        (shadow_lower_x, shadow_lower_y, shadow_upper_x, shadow_upper_y) = shadow_roi
+        (shadow_lower_x, shadow_lower_y, shadow_upper_x,
+         shadow_upper_y) = shadow_roi
 
         assert 0 <= shadow_lower_x <= shadow_upper_x <= 1
         assert 0 <= shadow_lower_y <= shadow_upper_y <= 1
@@ -2052,7 +2181,8 @@ class RandomShadow(ImageOnlyTransform):
         img = params["image"]
         height, width = img.shape[:2]
 
-        num_shadows = random.randint(self.num_shadows_lower, self.num_shadows_upper)
+        num_shadows = random.randint(self.num_shadows_lower,
+                                     self.num_shadows_upper)
 
         x_min, y_min, x_max, y_max = self.shadow_roi
 
@@ -2066,7 +2196,8 @@ class RandomShadow(ImageOnlyTransform):
         for _index in range(num_shadows):
             vertex = []
             for _dimension in range(self.shadow_dimension):
-                vertex.append((random.randint(x_min, x_max), random.randint(y_min, y_max)))
+                vertex.append((random.randint(x_min, x_max),
+                               random.randint(y_min, y_max)))
 
             vertices = np.array([vertex], dtype=np.int32)
             vertices_list.append(vertices)
@@ -2074,7 +2205,8 @@ class RandomShadow(ImageOnlyTransform):
         return {"vertices_list": vertices_list}
 
     def get_transform_init_args_names(self):
-        return ("shadow_roi", "num_shadows_lower", "num_shadows_upper", "shadow_dimension")
+        return ("shadow_roi", "num_shadows_lower", "num_shadows_upper",
+                "shadow_dimension")
 
 
 class HueSaturationValue(ImageOnlyTransform):
@@ -2096,7 +2228,8 @@ class HueSaturationValue(ImageOnlyTransform):
         uint8, float32
     """
 
-    def __init__(self, hue_shift_limit=20, sat_shift_limit=30, val_shift_limit=20, always_apply=False, p=0.5):
+    def __init__(self, hue_shift_limit=20, sat_shift_limit=30,
+                 val_shift_limit=20, always_apply=False, p=0.5):
         super(HueSaturationValue, self).__init__(always_apply, p)
         self.hue_shift_limit = to_tuple(hue_shift_limit)
         self.sat_shift_limit = to_tuple(sat_shift_limit)
@@ -2107,9 +2240,12 @@ class HueSaturationValue(ImageOnlyTransform):
 
     def get_params(self):
         return {
-            "hue_shift": random.uniform(self.hue_shift_limit[0], self.hue_shift_limit[1]),
-            "sat_shift": random.uniform(self.sat_shift_limit[0], self.sat_shift_limit[1]),
-            "val_shift": random.uniform(self.val_shift_limit[0], self.val_shift_limit[1]),
+            "hue_shift": random.uniform(self.hue_shift_limit[0],
+                                        self.hue_shift_limit[1]),
+            "sat_shift": random.uniform(self.sat_shift_limit[0],
+                                        self.sat_shift_limit[1]),
+            "val_shift": random.uniform(self.val_shift_limit[0],
+                                        self.val_shift_limit[1]),
         }
 
     def get_transform_init_args_names(self):
@@ -2143,7 +2279,8 @@ class Solarize(ImageOnlyTransform):
         return F.solarize(image, threshold)
 
     def get_params(self):
-        return {"threshold": random.uniform(self.threshold[0], self.threshold[1])}
+        return {
+            "threshold": random.uniform(self.threshold[0], self.threshold[1])}
 
     def get_transform_init_args_names(self):
         return ("threshold",)
@@ -2183,7 +2320,8 @@ class Posterize(ImageOnlyTransform):
 
     def get_params(self):
         if len(self.num_bits) == 3:
-            return {"num_bits": [random.randint(i[0], i[1]) for i in self.num_bits]}
+            return {"num_bits": [random.randint(i[0], i[1]) for i in
+                                 self.num_bits]}
         return {"num_bits": random.randint(self.num_bits[0], self.num_bits[1])}
 
     def get_transform_init_args_names(self):
@@ -2210,10 +2348,13 @@ class Equalize(ImageOnlyTransform):
 
     """
 
-    def __init__(self, mode="cv", by_channels=True, mask=None, mask_params=(), always_apply=False, p=0.5):
+    def __init__(self, mode="cv", by_channels=True, mask=None, mask_params=(),
+                 always_apply=False, p=0.5):
         modes = ["cv", "pil"]
         if mode not in modes:
-            raise ValueError("Unsupported equalization mode. Supports: {}. " "Got: {}".format(modes, mode))
+            raise ValueError(
+                "Unsupported equalization mode. Supports: {}. " "Got: {}".format(
+                    modes, mode))
 
         super(Equalize, self).__init__(always_apply, p)
         self.mode = mode
@@ -2222,7 +2363,8 @@ class Equalize(ImageOnlyTransform):
         self.mask_params = mask_params
 
     def apply(self, image, mask=None, **params):
-        return F.equalize(image, mode=self.mode, by_channels=self.by_channels, mask=mask)
+        return F.equalize(image, mode=self.mode, by_channels=self.by_channels,
+                          mask=mask)
 
     def get_params_dependent_on_targets(self, params):
         if not callable(self.mask):
@@ -2257,7 +2399,8 @@ class RGBShift(ImageOnlyTransform):
         uint8, float32
     """
 
-    def __init__(self, r_shift_limit=20, g_shift_limit=20, b_shift_limit=20, always_apply=False, p=0.5):
+    def __init__(self, r_shift_limit=20, g_shift_limit=20, b_shift_limit=20,
+                 always_apply=False, p=0.5):
         super(RGBShift, self).__init__(always_apply, p)
         self.r_shift_limit = to_tuple(r_shift_limit)
         self.g_shift_limit = to_tuple(g_shift_limit)
@@ -2268,9 +2411,12 @@ class RGBShift(ImageOnlyTransform):
 
     def get_params(self):
         return {
-            "r_shift": random.uniform(self.r_shift_limit[0], self.r_shift_limit[1]),
-            "g_shift": random.uniform(self.g_shift_limit[0], self.g_shift_limit[1]),
-            "b_shift": random.uniform(self.b_shift_limit[0], self.b_shift_limit[1]),
+            "r_shift": random.uniform(self.r_shift_limit[0],
+                                      self.r_shift_limit[1]),
+            "g_shift": random.uniform(self.g_shift_limit[0],
+                                      self.g_shift_limit[1]),
+            "b_shift": random.uniform(self.b_shift_limit[0],
+                                      self.b_shift_limit[1]),
         }
 
     def get_transform_init_args_names(self):
@@ -2296,19 +2442,23 @@ class RandomBrightnessContrast(ImageOnlyTransform):
         uint8, float32
     """
 
-    def __init__(self, brightness_limit=0.2, contrast_limit=0.2, brightness_by_max=True, always_apply=False, p=0.5):
+    def __init__(self, brightness_limit=0.2, contrast_limit=0.2,
+                 brightness_by_max=True, always_apply=False, p=0.5):
         super(RandomBrightnessContrast, self).__init__(always_apply, p)
         self.brightness_limit = to_tuple(brightness_limit)
         self.contrast_limit = to_tuple(contrast_limit)
         self.brightness_by_max = brightness_by_max
 
     def apply(self, img, alpha=1.0, beta=0.0, **params):
-        return F.brightness_contrast_adjust(img, alpha, beta, self.brightness_by_max)
+        return F.brightness_contrast_adjust(img, alpha, beta,
+                                            self.brightness_by_max)
 
     def get_params(self):
         return {
-            "alpha": 1.0 + random.uniform(self.contrast_limit[0], self.contrast_limit[1]),
-            "beta": 0.0 + random.uniform(self.brightness_limit[0], self.brightness_limit[1]),
+            "alpha": 1.0 + random.uniform(self.contrast_limit[0],
+                                          self.contrast_limit[1]),
+            "beta": 0.0 + random.uniform(self.brightness_limit[0],
+                                         self.brightness_limit[1]),
         }
 
     def get_transform_init_args_names(self):
@@ -2332,9 +2482,12 @@ class RandomBrightness(RandomBrightnessContrast):
 
     def __init__(self, limit=0.2, always_apply=False, p=0.5):
         super(RandomBrightness, self).__init__(
-            brightness_limit=limit, contrast_limit=0, always_apply=always_apply, p=p
+            brightness_limit=limit, contrast_limit=0,
+            always_apply=always_apply, p=p
         )
-        warnings.warn("This class has been deprecated. Please use RandomBrightnessContrast", DeprecationWarning)
+        warnings.warn(
+            "This class has been deprecated. Please use RandomBrightnessContrast",
+            DeprecationWarning)
 
     def get_transform_init_args(self):
         return {"limit": self.brightness_limit}
@@ -2356,8 +2509,12 @@ class RandomContrast(RandomBrightnessContrast):
     """
 
     def __init__(self, limit=0.2, always_apply=False, p=0.5):
-        super(RandomContrast, self).__init__(brightness_limit=0, contrast_limit=limit, always_apply=always_apply, p=p)
-        warnings.warn("This class has been deprecated. Please use RandomBrightnessContrast", DeprecationWarning)
+        super(RandomContrast, self).__init__(brightness_limit=0,
+                                             contrast_limit=limit,
+                                             always_apply=always_apply, p=p)
+        warnings.warn(
+            "This class has been deprecated. Please use RandomBrightnessContrast",
+            DeprecationWarning)
 
     def get_transform_init_args(self):
         return {"limit": self.contrast_limit}
@@ -2386,7 +2543,8 @@ class Blur(ImageOnlyTransform):
         return F.blur(image, ksize)
 
     def get_params(self):
-        return {"ksize": random.choice(np.arange(self.blur_limit[0], self.blur_limit[1] + 1, 2))}
+        return {"ksize": random.choice(
+            np.arange(self.blur_limit[0], self.blur_limit[1] + 1, 2))}
 
     def get_transform_init_args_names(self):
         return ("blur_limit",)
@@ -2411,7 +2569,8 @@ class MotionBlur(Blur):
         return F.motion_blur(img, kernel=kernel)
 
     def get_params(self):
-        ksize = random.choice(np.arange(self.blur_limit[0], self.blur_limit[1] + 1, 2))
+        ksize = random.choice(
+            np.arange(self.blur_limit[0], self.blur_limit[1] + 1, 2))
         assert ksize > 2
         kernel = np.zeros((ksize, ksize), dtype=np.uint8)
         xs, xe = random.randint(0, ksize - 1), random.randint(0, ksize - 1)
@@ -2483,7 +2642,8 @@ class GaussNoise(ImageOnlyTransform):
         uint8, float32
     """
 
-    def __init__(self, var_limit=(10.0, 50.0), mean=0, always_apply=False, p=0.5):
+    def __init__(self, var_limit=(10.0, 50.0), mean=0, always_apply=False,
+                 p=0.5):
         super(GaussNoise, self).__init__(always_apply, p)
         if isinstance(var_limit, tuple):
             if var_limit[0] < 0:
@@ -2537,17 +2697,21 @@ class ISONoise(ImageOnlyTransform):
         uint8
     """
 
-    def __init__(self, color_shift=(0.01, 0.05), intensity=(0.1, 0.5), always_apply=False, p=0.5):
+    def __init__(self, color_shift=(0.01, 0.05), intensity=(0.1, 0.5),
+                 always_apply=False, p=0.5):
         super(ISONoise, self).__init__(always_apply, p)
         self.intensity = intensity
         self.color_shift = color_shift
 
-    def apply(self, img, color_shift=0.05, intensity=1.0, random_state=None, **params):
-        return F.iso_noise(img, color_shift, intensity, np.random.RandomState(random_state))
+    def apply(self, img, color_shift=0.05, intensity=1.0, random_state=None,
+              **params):
+        return F.iso_noise(img, color_shift, intensity,
+                           np.random.RandomState(random_state))
 
     def get_params(self):
         return {
-            "color_shift": random.uniform(self.color_shift[0], self.color_shift[1]),
+            "color_shift": random.uniform(self.color_shift[0],
+                                          self.color_shift[1]),
             "intensity": random.uniform(self.intensity[0], self.intensity[1]),
             "random_state": random.randint(0, 65536),
         }
@@ -2572,7 +2736,8 @@ class CLAHE(ImageOnlyTransform):
         uint8
     """
 
-    def __init__(self, clip_limit=4.0, tile_grid_size=(8, 8), always_apply=False, p=0.5):
+    def __init__(self, clip_limit=4.0, tile_grid_size=(8, 8),
+                 always_apply=False, p=0.5):
         super(CLAHE, self).__init__(always_apply, p)
         self.clip_limit = to_tuple(clip_limit, 1)
         self.tile_grid_size = tuple(tile_grid_size)
@@ -2581,7 +2746,8 @@ class CLAHE(ImageOnlyTransform):
         return F.clahe(img, clip_limit, self.tile_grid_size)
 
     def get_params(self):
-        return {"clip_limit": random.uniform(self.clip_limit[0], self.clip_limit[1])}
+        return {"clip_limit": random.uniform(self.clip_limit[0],
+                                             self.clip_limit[1])}
 
     def get_transform_init_args_names(self):
         return ("clip_limit", "tile_grid_size")
@@ -2602,7 +2768,8 @@ class ChannelDropout(ImageOnlyTransform):
         uint8, uint16, unit32, float32
     """
 
-    def __init__(self, channel_drop_range=(1, 1), fill_value=0, always_apply=False, p=0.5):
+    def __init__(self, channel_drop_range=(1, 1), fill_value=0,
+                 always_apply=False, p=0.5):
         super(ChannelDropout, self).__init__(always_apply, p)
 
         self.channel_drop_range = channel_drop_range
@@ -2623,14 +2790,17 @@ class ChannelDropout(ImageOnlyTransform):
         num_channels = img.shape[-1]
 
         if len(img.shape) == 2 or num_channels == 1:
-            raise NotImplementedError("Images has one channel. ChannelDropout is not defined.")
+            raise NotImplementedError(
+                "Images has one channel. ChannelDropout is not defined.")
 
         if self.max_channels >= num_channels:
             raise ValueError("Can not drop all channels in ChannelDropout.")
 
-        num_drop_channels = random.randint(self.min_channels, self.max_channels)
+        num_drop_channels = random.randint(self.min_channels,
+                                           self.max_channels)
 
-        channels_to_drop = random.sample(range(num_channels), k=num_drop_channels)
+        channels_to_drop = random.sample(range(num_channels),
+                                         k=num_drop_channels)
 
         return {"channels_to_drop": channels_to_drop}
 
@@ -2706,7 +2876,8 @@ class RandomGamma(ImageOnlyTransform):
         uint8, float32
     """
 
-    def __init__(self, gamma_limit=(80, 120), eps=1e-7, always_apply=False, p=0.5):
+    def __init__(self, gamma_limit=(80, 120), eps=1e-7, always_apply=False,
+                 p=0.5):
         super(RandomGamma, self).__init__(always_apply, p)
         self.gamma_limit = to_tuple(gamma_limit)
         self.eps = eps
@@ -2715,7 +2886,8 @@ class RandomGamma(ImageOnlyTransform):
         return F.gamma_transform(img, gamma=gamma, eps=self.eps)
 
     def get_params(self):
-        return {"gamma": random.randint(self.gamma_limit[0], self.gamma_limit[1]) / 100.0}
+        return {"gamma": random.randint(self.gamma_limit[0],
+                                        self.gamma_limit[1]) / 100.0}
 
     def get_transform_init_args_names(self):
         return ("gamma_limit", "eps")
@@ -2796,7 +2968,8 @@ class FromFloat(ImageOnlyTransform):
        https://docs.scipy.org/doc/numpy/user/basics.types.html
     """
 
-    def __init__(self, dtype="uint16", max_value=None, always_apply=False, p=1.0):
+    def __init__(self, dtype="uint16", max_value=None, always_apply=False,
+                 p=1.0):
         super(FromFloat, self).__init__(always_apply, p)
         self.dtype = np.dtype(dtype)
         self.max_value = max_value
@@ -2823,12 +2996,14 @@ class Downscale(ImageOnlyTransform):
         uint8, float32
     """
 
-    def __init__(self, scale_min=0.25, scale_max=0.25, interpolation=cv2.INTER_NEAREST, always_apply=False, p=0.5):
+    def __init__(self, scale_min=0.25, scale_max=0.25,
+                 interpolation=cv2.INTER_NEAREST, always_apply=False, p=0.5):
         super(Downscale, self).__init__(always_apply, p)
         assert scale_min <= scale_max, "Expected scale_min be less or equal scale_max, got {} {}".format(
             scale_min, scale_max
         )
-        assert scale_max < 1, "Expected scale_max to be less than 1, got {}".format(scale_max)
+        assert scale_max < 1, "Expected scale_max to be less than 1, got {}".format(
+            scale_max)
         self.scale_min = scale_min
         self.scale_max = scale_max
         self.interpolation = interpolation
@@ -2837,7 +3012,8 @@ class Downscale(ImageOnlyTransform):
         return F.downscale(image, scale=scale, interpolation=interpolation)
 
     def get_params(self):
-        return {"scale": np.random.uniform(self.scale_min, self.scale_max), "interpolation": self.interpolation}
+        return {"scale": np.random.uniform(self.scale_min, self.scale_max),
+                "interpolation": self.interpolation}
 
     def get_transform_init_args_names(self):
         return "scale_min", "scale_max", "interpolation"
@@ -2863,12 +3039,16 @@ class Lambda(NoOp):
 
     """
 
-    def __init__(self, image=None, mask=None, keypoint=None, bbox=None, name=None, always_apply=False, p=1.0):
+    def __init__(self, image=None, mask=None, keypoint=None, bbox=None,
+                 name=None, always_apply=False, p=1.0):
         super(Lambda, self).__init__(always_apply, p)
 
         self.name = name
-        self.custom_apply_fns = {target_name: F.noop for target_name in ("image", "mask", "keypoint", "bbox")}
-        for target_name, custom_apply_fn in {"image": image, "mask": mask, "keypoint": keypoint, "bbox": bbox}.items():
+        self.custom_apply_fns = {target_name: F.noop for target_name in
+                                 ("image", "mask", "keypoint", "bbox")}
+        for target_name, custom_apply_fn in {"image": image, "mask": mask,
+                                             "keypoint": keypoint,
+                                             "bbox": bbox}.items():
             if custom_apply_fn is not None:
                 if isinstance(custom_apply_fn, LambdaType):
                     warnings.warn(
@@ -2906,4 +3086,38 @@ class Lambda(NoOp):
         state = {"name": self.name}
         state.update(self.custom_apply_fns.items())
         state.update(self.get_base_init_args())
-        return "{name}({args})".format(name=self.__class__.__name__, args=format_args(state))
+        return "{name}({args})".format(name=self.__class__.__name__,
+                                       args=format_args(state))
+
+
+class ToOpenCL(DualTransform):
+    """
+
+    Limitations: Only 1,2,3 and 4-channel images and masks are supported
+    """
+    def __init__(self):
+        super().__init__(p=1)
+
+    def apply(self, img, **params):
+        img: cv2.UMat = cv2.UMat(img)
+        return img
+
+    def get_transform_init_args_names(self):
+        return tuple()
+
+    def __call__(self, *args, **kwargs):
+        kwargs['image_shape'] = tuple(kwargs['image'].shape)
+        return super().__call__(*args, **kwargs)
+
+
+class ToNumpy(DualTransform):
+    def __init__(self):
+        super().__init__(p=1)
+
+    def apply(self, img, **params):
+        if isinstance(img, cv2.UMat):
+            img = img.get()
+        return img
+
+    def get_transform_init_args_names(self):
+        return tuple()
