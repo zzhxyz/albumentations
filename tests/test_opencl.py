@@ -21,7 +21,6 @@ def test_opencl():
         A.ToNumpy()
     ])
 
-
     print(cv2.getBuildInformation())
 
     for j in range(16):
