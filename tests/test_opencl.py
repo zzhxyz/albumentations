@@ -5,21 +5,25 @@ import albumentations as A
 
 
 def test_opencl():
-    aug_cpu = A.Compose([
-        A.RandomSizedCrop((224, 384), 256, 256, p=1),
-        A.ShiftScaleRotate(p=1),
-        A.GaussianBlur(p=1),
-        # A.ElasticTransform()
-    ])
+    aug_cpu = A.Compose(
+        [
+            A.RandomSizedCrop((224, 384), 256, 256, p=1),
+            A.ShiftScaleRotate(p=1),
+            A.GaussianBlur(p=1),
+            # A.ElasticTransform()
+        ]
+    )
 
-    aug_gpu = A.Compose([
-        A.ToOpenCL(),
-        A.RandomSizedCrop((224, 384), 256, 256, p=1),
-        A.ShiftScaleRotate(p=1),
-        A.GaussianBlur(p=1),
-        # A.ElasticTransform(),
-        A.ToNumpy()
-    ])
+    aug_gpu = A.Compose(
+        [
+            A.ToOpenCL(),
+            A.RandomSizedCrop((224, 384), 256, 256, p=1),
+            A.ShiftScaleRotate(p=1),
+            A.GaussianBlur(p=1),
+            # A.ElasticTransform(),
+            A.ToNumpy(),
+        ]
+    )
 
     print(cv2.getBuildInformation())
 
@@ -43,6 +47,4 @@ def test_opencl():
             time2 += end2 - start2
 
         f = cv2.getTickFrequency()
-        print('CPU', time1 / f,
-              'OpenCL', time2 / f,
-              'Speedup', time1 / time2)
+        print("CPU", time1 / f, "OpenCL", time2 / f, "Speedup", time1 / time2)
