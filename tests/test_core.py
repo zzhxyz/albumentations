@@ -7,7 +7,7 @@ import pytest
 from albumentations.core.transforms_interface import to_tuple, ImageOnlyTransform, DualTransform
 from albumentations.augmentations.bbox_utils import check_bboxes
 from albumentations.core.composition import OneOrOther, Compose, OneOf, PerChannel, ReplayCompose
-from albumentations.augmentations.transforms import HorizontalFlip, Rotate, Blur, MedianBlur
+from albumentations import HorizontalFlip, Rotate, Blur, MedianBlur
 from .compat import mock, MagicMock, Mock, call
 
 

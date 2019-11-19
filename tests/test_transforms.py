@@ -6,7 +6,11 @@ import numpy as np
 import pytest
 
 import albumentations as A
-import albumentations.augmentations.functional as F
+import albumentations.augmentations.image_only.functional as FImageOnly
+import albumentations.augmentations.dual.functional as FDual
+import albumentations.augmentations.dual.functional_bbox as FBbox
+import albumentations.augmentations.dual.functional_keypoint as FKeypoint
+import albumentations.augmentations.utils as FUtils
 from .conftest import skip_appveyor
 
 
@@ -25,8 +29,8 @@ def test_rotate_interpolation(interpolation):
     mask = np.random.randint(low=0, high=2, size=(100, 100), dtype=np.uint8)
     aug = A.Rotate(limit=(45, 45), interpolation=interpolation, p=1)
     data = aug(image=image, mask=mask)
-    expected_image = F.rotate(image, 45, interpolation=interpolation, border_mode=cv2.BORDER_REFLECT_101)
-    expected_mask = F.rotate(mask, 45, interpolation=cv2.INTER_NEAREST, border_mode=cv2.BORDER_REFLECT_101)
+    expected_image = FDual.rotate(image, 45, interpolation=interpolation, border_mode=cv2.BORDER_REFLECT_101)
+    expected_mask = FDual.rotate(mask, 45, interpolation=cv2.INTER_NEAREST, border_mode=cv2.BORDER_REFLECT_101)
     assert np.array_equal(data["image"], expected_image)
     assert np.array_equal(data["mask"], expected_mask)
 
@@ -39,10 +43,10 @@ def test_shift_scale_rotate_interpolation(interpolation):
         shift_limit=(0.2, 0.2), scale_limit=(1.1, 1.1), rotate_limit=(45, 45), interpolation=interpolation, p=1
     )
     data = aug(image=image, mask=mask)
-    expected_image = F.shift_scale_rotate(
+    expected_image = FDual.shift_scale_rotate(
         image, angle=45, scale=2.1, dx=0.2, dy=0.2, interpolation=interpolation, border_mode=cv2.BORDER_REFLECT_101
     )
-    expected_mask = F.shift_scale_rotate(
+    expected_mask = FDual.shift_scale_rotate(
         mask, angle=45, scale=2.1, dx=0.2, dy=0.2, interpolation=cv2.INTER_NEAREST, border_mode=cv2.BORDER_REFLECT_101
     )
     assert np.array_equal(data["image"], expected_image)
@@ -55,10 +59,10 @@ def test_optical_distortion_interpolation(interpolation):
     mask = np.random.randint(low=0, high=2, size=(100, 100), dtype=np.uint8)
     aug = A.OpticalDistortion(distort_limit=(0.05, 0.05), shift_limit=(0, 0), interpolation=interpolation, p=1)
     data = aug(image=image, mask=mask)
-    expected_image = F.optical_distortion(
+    expected_image = FDual.optical_distortion(
         image, k=0.05, dx=0, dy=0, interpolation=interpolation, border_mode=cv2.BORDER_REFLECT_101
     )
-    expected_mask = F.optical_distortion(
+    expected_mask = FDual.optical_distortion(
         mask, k=0.05, dx=0, dy=0, interpolation=cv2.INTER_NEAREST, border_mode=cv2.BORDER_REFLECT_101
     )
     assert np.array_equal(data["image"], expected_image)
@@ -71,10 +75,10 @@ def test_grid_distortion_interpolation(interpolation):
     mask = np.random.randint(low=0, high=2, size=(100, 100), dtype=np.uint8)
     aug = A.GridDistortion(num_steps=1, distort_limit=(0.3, 0.3), interpolation=interpolation, p=1)
     data = aug(image=image, mask=mask)
-    expected_image = F.grid_distortion(
+    expected_image = FDual.grid_distortion(
         image, num_steps=1, xsteps=[1.3], ysteps=[1.3], interpolation=interpolation, border_mode=cv2.BORDER_REFLECT_101
     )
-    expected_mask = F.grid_distortion(
+    expected_mask = FDual.grid_distortion(
         mask,
         num_steps=1,
         xsteps=[1.3],
@@ -90,12 +94,10 @@ def test_grid_distortion_interpolation(interpolation):
 def test_elastic_transform_interpolation(monkeypatch, interpolation):
     image = np.random.randint(low=0, high=256, size=(100, 100, 3), dtype=np.uint8)
     mask = np.random.randint(low=0, high=2, size=(100, 100), dtype=np.uint8)
-    monkeypatch.setattr(
-        "albumentations.augmentations.transforms.ElasticTransform.get_params", lambda *_: {"random_state": 1111}
-    )
+    monkeypatch.setattr("albumentations.ElasticTransform.get_params", lambda *_: {"random_state": 1111})
     aug = A.ElasticTransform(alpha=1, sigma=50, alpha_affine=50, interpolation=interpolation, p=1)
     data = aug(image=image, mask=mask)
-    expected_image = F.elastic_transform(
+    expected_image = FDual.elastic_transform(
         image,
         alpha=1,
         sigma=50,
@@ -104,7 +106,7 @@ def test_elastic_transform_interpolation(monkeypatch, interpolation):
         border_mode=cv2.BORDER_REFLECT_101,
         random_state=np.random.RandomState(1111),
     )
-    expected_mask = F.elastic_transform(
+    expected_mask = FDual.elastic_transform(
         mask,
         alpha=1,
         sigma=50,
@@ -295,10 +297,10 @@ def test_lambda_transform():
         return new_mask
 
     def vflip_bbox(bbox, **kwargs):
-        return F.bbox_vflip(bbox, **kwargs)
+        return FBbox.bbox_vflip(bbox, **kwargs)
 
     def vflip_keypoint(keypoint, **kwargs):
-        return F.keypoint_vflip(keypoint, **kwargs)
+        return FKeypoint.keypoint_vflip(keypoint, **kwargs)
 
     aug = A.Lambda(
         image=negate_image, mask=partial(one_hot_mask, num_channels=16), bbox=vflip_bbox, keypoint=vflip_keypoint, p=1
@@ -312,8 +314,8 @@ def test_lambda_transform():
     )
     assert (output["image"] < 0).all()
     assert output["mask"].shape[2] == 16  # num_channels
-    assert output["bboxes"] == [F.bbox_vflip((10, 15, 25, 35), 10, 10)]
-    assert output["keypoints"] == [F.keypoint_vflip((20, 30, 40, 50), 10, 10)]
+    assert output["bboxes"] == [FBbox.bbox_vflip((10, 15, 25, 35), 10, 10)]
+    assert output["keypoints"] == [FKeypoint.keypoint_vflip((20, 30, 40, 50), 10, 10)]
 
 
 def test_channel_droput():
@@ -336,20 +338,20 @@ def test_equalize():
 
     img = np.random.randint(0, 256, 256 * 256 * 3, np.uint8).reshape((256, 256, 3))
     a = aug(image=img)["image"]
-    b = F.equalize(img)
+    b = FImageOnly.equalize(img)
     assert np.all(a == b)
 
     mask = np.random.randint(0, 2, 256 * 256, np.uint8).reshape((256, 256))
     aug = A.Equalize(mask=mask, p=1)
     a = aug(image=img)["image"]
-    b = F.equalize(img, mask=mask)
+    b = FImageOnly.equalize(img, mask=mask)
     assert np.all(a == b)
 
     def mask_func(image, test):
         return mask
 
     aug = A.Equalize(mask=mask_func, mask_params=["test"], p=1)
-    assert np.all(aug(image=img, test=mask)["image"] == F.equalize(img, mask=mask))
+    assert np.all(aug(image=img, test=mask)["image"] == FImageOnly.equalize(img, mask=mask))
 
 
 def test_crop_non_empty_mask():
@@ -410,7 +412,7 @@ def test_downscale(interpolation):
 
     for img in (img_float, img_uint):
         transformed = aug(image=img)["image"]
-        func_applied = F.downscale(img, scale=0.5, interpolation=interpolation)
+        func_applied = FImageOnly.downscale(img, scale=0.5, interpolation=interpolation)
         np.testing.assert_almost_equal(transformed, func_applied)
 
 
@@ -481,7 +483,7 @@ def test_multiplicative_noise_grayscale(image):
     m = 0.5
     aug = A.MultiplicativeNoise(m, p=1)
     result = aug(image=image)["image"]
-    image = F.clip(image * m, image.dtype, F.MAX_VALUES_BY_DTYPE[image.dtype])
+    image = FUtils.clip(image * m, image.dtype, FUtils.MAX_VALUES_BY_DTYPE[image.dtype])
     assert np.allclose(image, result)
 
     aug = A.MultiplicativeNoise(elementwise=True, p=1)
@@ -491,7 +493,7 @@ def test_multiplicative_noise_grayscale(image):
     result = aug.apply(image, mul)
     dtype = image.dtype
     image = image.astype(np.float32) * mul
-    image = F.clip(image, dtype, F.MAX_VALUES_BY_DTYPE[dtype])
+    image = FUtils.clip(image, dtype, FUtils.MAX_VALUES_BY_DTYPE[dtype])
     assert np.allclose(image, result)
 
 
@@ -504,7 +506,7 @@ def test_multiplicative_noise_rgb(image):
     m = 0.5
     aug = A.MultiplicativeNoise(m, p=1)
     result = aug(image=image)["image"]
-    image = F.clip(image * m, dtype, F.MAX_VALUES_BY_DTYPE[dtype])
+    image = FUtils.clip(image * m, dtype, FUtils.MAX_VALUES_BY_DTYPE[dtype])
     assert np.allclose(image, result)
 
     aug = A.MultiplicativeNoise(elementwise=True, p=1)
@@ -512,7 +514,7 @@ def test_multiplicative_noise_rgb(image):
     mul = params["multiplier"]
     assert mul.shape == image.shape[:2] + (1,)
     result = aug.apply(image, mul)
-    image = F.clip(image.astype(np.float32) * mul, dtype, F.MAX_VALUES_BY_DTYPE[dtype])
+    image = FUtils.clip(image.astype(np.float32) * mul, dtype, FUtils.MAX_VALUES_BY_DTYPE[dtype])
     assert np.allclose(image, result)
 
     aug = A.MultiplicativeNoise(per_channel=True, p=1)
@@ -520,7 +522,7 @@ def test_multiplicative_noise_rgb(image):
     mul = params["multiplier"]
     assert mul.shape == (3,)
     result = aug.apply(image, mul)
-    image = F.clip(image.astype(np.float32) * mul, dtype, F.MAX_VALUES_BY_DTYPE[dtype])
+    image = FUtils.clip(image.astype(np.float32) * mul, dtype, FUtils.MAX_VALUES_BY_DTYPE[dtype])
     assert np.allclose(image, result)
 
     aug = A.MultiplicativeNoise(elementwise=True, per_channel=True, p=1)
@@ -528,7 +530,7 @@ def test_multiplicative_noise_rgb(image):
     mul = params["multiplier"]
     assert mul.shape == image.shape
     result = aug.apply(image, mul)
-    image = F.clip(image.astype(np.float32) * mul, image.dtype, F.MAX_VALUES_BY_DTYPE[image.dtype])
+    image = FUtils.clip(image.astype(np.float32) * mul, image.dtype, FUtils.MAX_VALUES_BY_DTYPE[image.dtype])
     assert np.allclose(image, result)
 
 

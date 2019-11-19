@@ -13,8 +13,8 @@ from albumentations.augmentations.keypoints_utils import (
 )
 from albumentations.core.composition import Compose
 from albumentations.core.transforms_interface import NoOp
-from albumentations.augmentations.transforms import RandomSizedCrop, RandomResizedCrop
-import albumentations.augmentations.functional as F
+from albumentations import RandomSizedCrop, RandomResizedCrop
+import albumentations.augmentations.dual.functional_keypoint as F
 
 
 @pytest.mark.parametrize(

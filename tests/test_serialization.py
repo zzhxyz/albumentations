@@ -6,7 +6,9 @@ import numpy as np
 import imgaug as ia
 
 import albumentations as A
-import albumentations.augmentations.functional as F
+import albumentations.augmentations.dual.functional as FDual
+import albumentations.augmentations.dual.functional_bbox as FBbox
+import albumentations.augmentations.dual.functional_keypoint as FKeypoint
 
 
 TEST_SEEDS = (0, 1, 42, 111, 9999)
@@ -651,17 +653,17 @@ def test_additional_targets_for_image_only_serialization(augmentation_cls, param
 @pytest.mark.parametrize("seed", TEST_SEEDS)
 @pytest.mark.parametrize("p", [1])
 def test_lambda_serialization(image, mask, albumentations_bboxes, keypoints, seed, p):
-    def vflip_image(image, **kwargs):
-        return F.vflip(image)
+    def vflip_image(image, **__):
+        return FDual.vflip(image)
 
-    def vflip_mask(mask, **kwargs):
-        return F.vflip(mask)
+    def vflip_mask(mask, **__):
+        return FDual.vflip(mask)
 
     def vflip_bbox(bbox, **kwargs):
-        return F.bbox_vflip(bbox, **kwargs)
+        return FBbox.bbox_vflip(bbox, **kwargs)
 
     def vflip_keypoint(keypoint, **kwargs):
-        return F.keypoint_vflip(keypoint, **kwargs)
+        return FKeypoint.keypoint_vflip(keypoint, **kwargs)
 
     aug = A.Lambda(name="vflip", image=vflip_image, mask=vflip_mask, bbox=vflip_bbox, keypoint=vflip_keypoint, p=p)
 

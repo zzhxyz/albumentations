@@ -22,7 +22,10 @@ READTHEDOCS_TEMPLATE_ALBU = (
     "[{name}](https://albumentations.readthedocs.io/en/latest/api/augmentations.html#albumentations"
 )
 READTHEDOCS_TEMPLATE_IMGAUG = "[{name}](https://albumentations.readthedocs.io/en/latest/api/imgaug.html#albumentations"
-TRANSFORM_NAME_WITH_LINK_TEMPLATE = READTHEDOCS_TEMPLATE_ALBU + ".augmentations.transforms.{name})"
+IMAGE_ONLY_TRANSFORM_NAME_WITH_LINK_TEMPLATE = (
+    READTHEDOCS_TEMPLATE_ALBU + ".augmentations.image_only.transforms.{name})"
+)
+DUAL_TRANSFORM_NAME_WITH_LINK_TEMPLATE = READTHEDOCS_TEMPLATE_ALBU + ".augmentations.dual.transforms.{name})"
 IMGAUG_TRANSFORM_NAME_WITH_LINK_TEMPLATE = READTHEDOCS_TEMPLATE_IMGAUG + ".imgaug.transforms.{name})"
 
 
@@ -75,8 +78,10 @@ def get_transforms_info():
                 targets.add(Targets.KEYPOINTS)
 
             docs_link = None
-            if cls.__module__ == "albumentations.augmentations.transforms":
-                docs_link = TRANSFORM_NAME_WITH_LINK_TEMPLATE.format(name=name)
+            if issubclass(cls, albumentations.ImageOnlyTransform):
+                docs_link = IMAGE_ONLY_TRANSFORM_NAME_WITH_LINK_TEMPLATE.format(name=name)
+            elif issubclass(cls, albumentations.DualTransform):
+                docs_link = DUAL_TRANSFORM_NAME_WITH_LINK_TEMPLATE.format(name=name)
             elif cls.__module__ == "albumentations.imgaug.transforms":
                 docs_link = IMGAUG_TRANSFORM_NAME_WITH_LINK_TEMPLATE.format(name=name)
 
@@ -118,7 +123,7 @@ def make_transforms_targets_table(transforms_info, header):
 
 def make_transforms_targets_links(transforms_info):
     return "\n".join(
-        "- " + info["docs_link"] for transform, info in sorted(transforms_info.items(), key=lambda kv: kv[0])
+        "- " + str(info["docs_link"]) for transform, info in sorted(transforms_info.items(), key=lambda kv: kv[0])
     )
 
 
