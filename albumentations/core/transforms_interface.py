@@ -1,8 +1,10 @@
 from __future__ import absolute_import
 
 import random
+from warnings import warn
 
 import cv2
+from copy import deepcopy
 
 from albumentations.core.serialization import SerializableMeta
 from albumentations.core.six import add_metaclass
@@ -44,15 +46,30 @@ def to_tuple(param, low=None, bias=None):
 
 @add_metaclass(SerializableMeta)
 class BasicTransform(object):
+    call_backup = None
+
     def __init__(self, always_apply=False, p=0.5):
         self.p = p
         self.always_apply = always_apply
         self._additional_targets = {}
 
+        # replay mode params
+        self.deterministic = False
+        self.save_key = "replay"
+        self.params = {}
+        self.replay_mode = False
+        self.applied_in_replay = False
+
     def __call__(self, force_apply=False, **kwargs):
+        if self.replay_mode:
+            if self.applied_in_replay:
+                return self.apply_with_params(self.params, **kwargs)
+            else:
+                return kwargs
+
         if (random.random() < self.p) or self.always_apply or force_apply:
             params = self.get_params()
-            params = self.update_params(params, **kwargs)
+
             if self.targets_as_params:
                 assert all(key in kwargs for key in self.targets_as_params), "{} requires {}".format(
                     self.__class__.__name__, self.targets_as_params
@@ -60,16 +77,36 @@ class BasicTransform(object):
                 targets_as_params = {k: kwargs[k] for k in self.targets_as_params}
                 params_dependent_on_targets = self.get_params_dependent_on_targets(targets_as_params)
                 params.update(params_dependent_on_targets)
-            res = {}
-            for key, arg in kwargs.items():
-                if arg is not None:
-                    target_function = self._get_target_function(key)
-                    target_dependencies = {k: kwargs[k] for k in self.target_dependence.get(key, [])}
-                    res[key] = target_function(arg, **dict(params, **target_dependencies))
-                else:
-                    res[key] = None
-            return res
+            if self.deterministic:
+                if self.targets_as_params:
+                    warn(
+                        self.get_class_fullname() + " could work incorrectly in ReplayMode for other input data"
+                        " because its' params depend on targets."
+                    )
+                kwargs[self.save_key][id(self)] = deepcopy(params)
+            return self.apply_with_params(params, **kwargs)
+
         return kwargs
+
+    def apply_with_params(self, params, force_apply=False, **kwargs):
+        if params is None:
+            return kwargs
+        params = self.update_params(params, **kwargs)
+        res = {}
+        for key, arg in kwargs.items():
+            if arg is not None:
+                target_function = self._get_target_function(key)
+                target_dependencies = {k: kwargs[k] for k in self.target_dependence.get(key, [])}
+                res[key] = target_function(arg, **dict(params, **target_dependencies))
+            else:
+                res[key] = None
+        return res
+
+    def set_deterministic(self, flag, save_key="replay"):
+        assert save_key != "params", "params save_key is reserved"
+        self.deterministic = flag
+        self.save_key = save_key
+        return self
 
     def __repr__(self):
         state = self.get_base_init_args()
@@ -151,6 +188,11 @@ class BasicTransform(object):
         state.update(self.get_transform_init_args())
         return state
 
+    def get_dict_with_id(self):
+        d = self._to_dict()
+        d["id"] = id(self)
+        return d
+
 
 class DualTransform(BasicTransform):
     """Transform for segmentation task."""
@@ -172,12 +214,10 @@ class DualTransform(BasicTransform):
         raise NotImplementedError("Method apply_to_keypoint is not implemented in class " + self.__class__.__name__)
 
     def apply_to_bboxes(self, bboxes, **params):
-        bboxes = [list(bbox) for bbox in bboxes]
-        return [self.apply_to_bbox(bbox[:4], **params) + bbox[4:] for bbox in bboxes]
+        return [self.apply_to_bbox(tuple(bbox[:4]), **params) + tuple(bbox[4:]) for bbox in bboxes]
 
     def apply_to_keypoints(self, keypoints, **params):
-        keypoints = [list(keypoint) for keypoint in keypoints]
-        return [self.apply_to_keypoint(keypoint[:4], **params) + keypoint[4:] for keypoint in keypoints]
+        return [self.apply_to_keypoint(tuple(keypoint[:4]), **params) + tuple(keypoint[4:]) for keypoint in keypoints]
 
     def apply_to_mask(self, img, **params):
         return self.apply(img, **{k: cv2.INTER_NEAREST if k == "interpolation" else v for k, v in params.items()})
@@ -208,3 +248,6 @@ class NoOp(DualTransform):
 
     def apply_to_mask(self, img, **params):
         return img
+
+    def get_transform_init_args_names(self):
+        return tuple()

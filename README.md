@@ -32,6 +32,8 @@
 - [Building the documentation](#building-the-documentation)
 - [Comments](#comments)
 - [Citing](#citing)
+- [Competitions won with the library](#competitions-won-with-the-library)
+- [Industry users](#used-by)
 
 ## How to use
 
@@ -52,6 +54,8 @@
 **Weather transforms** [`example_weather_transforms.ipynb`](https://github.com/albu/albumentations/blob/master/notebooks/example_weather_transforms.ipynb)
 
 **Serialization** [`serialization.ipynb`](https://github.com/albu/albumentations/blob/master/notebooks/serialization.ipynb)
+
+**Replay/Deterministic mode** [`replay.ipynb`](https://github.com/albu/albumentations/blob/master/notebooks/replay.ipynb)
 
 You can use this [Google Colaboratory notebook](https://colab.research.google.com/drive/1JuZ23u0C0gx93kV0oJ8Mq0B6CBYhPLXy#scrollTo=GwFN-In3iagp&forceEdit=true&offline=true&sandboxMode=true)
 to adjust image augmentation parameters and see the resulting images.
@@ -131,6 +135,7 @@ Pixel-level transforms will change just an input image and will leave any additi
 - [JpegCompression](https://albumentations.readthedocs.io/en/latest/api/augmentations.html#albumentations.augmentations.transforms.JpegCompression)
 - [MedianBlur](https://albumentations.readthedocs.io/en/latest/api/augmentations.html#albumentations.augmentations.transforms.MedianBlur)
 - [MotionBlur](https://albumentations.readthedocs.io/en/latest/api/augmentations.html#albumentations.augmentations.transforms.MotionBlur)
+- [MultiplicativeNoise](https://albumentations.readthedocs.io/en/latest/api/augmentations.html#albumentations.augmentations.transforms.MultiplicativeNoise)
 - [Normalize](https://albumentations.readthedocs.io/en/latest/api/augmentations.html#albumentations.augmentations.transforms.Normalize)
 - [Posterize](https://albumentations.readthedocs.io/en/latest/api/augmentations.html#albumentations.augmentations.transforms.Posterize)
 - [RGBShift](https://albumentations.readthedocs.io/en/latest/api/augmentations.html#albumentations.augmentations.transforms.RGBShift)
@@ -146,6 +151,7 @@ Pixel-level transforms will change just an input image and will leave any additi
 - [Solarize](https://albumentations.readthedocs.io/en/latest/api/augmentations.html#albumentations.augmentations.transforms.Solarize)
 - [ToFloat](https://albumentations.readthedocs.io/en/latest/api/augmentations.html#albumentations.augmentations.transforms.ToFloat)
 - [ToGray](https://albumentations.readthedocs.io/en/latest/api/augmentations.html#albumentations.augmentations.transforms.ToGray)
+- [ToSepia](https://albumentations.readthedocs.io/en/latest/api/augmentations.html#albumentations.augmentations.transforms.ToSepia)
 
 ## Spatial-level transforms
 Spatial-level transforms will simultaneously change both an input image as well as additional targets such as masks, bounding boxes, and keypoints. The following table shows which additional targets are supported by each transform.
@@ -153,8 +159,8 @@ Spatial-level transforms will simultaneously change both an input image as well 
 | Transform                                                                                                                                                           | Image | Masks | BBoxes | Keypoints |
 | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :---: | :---: | :----: | :-------: |
 | [CenterCrop](https://albumentations.readthedocs.io/en/latest/api/augmentations.html#albumentations.augmentations.transforms.CenterCrop)                             | ✓     | ✓     | ✓      | ✓         |
-| [Crop](https://albumentations.readthedocs.io/en/latest/api/augmentations.html#albumentations.augmentations.transforms.Crop)                                         | ✓     | ✓     | ✓      |           |
-| [CropNonEmptyMaskIfExists](https://albumentations.readthedocs.io/en/latest/api/augmentations.html#albumentations.augmentations.transforms.CropNonEmptyMaskIfExists) | ✓     | ✓     |        |           |
+| [Crop](https://albumentations.readthedocs.io/en/latest/api/augmentations.html#albumentations.augmentations.transforms.Crop)                                         | ✓     | ✓     | ✓      | ✓         |
+| [CropNonEmptyMaskIfExists](https://albumentations.readthedocs.io/en/latest/api/augmentations.html#albumentations.augmentations.transforms.CropNonEmptyMaskIfExists) | ✓     | ✓     | ✓      | ✓         |
 | [ElasticTransform](https://albumentations.readthedocs.io/en/latest/api/augmentations.html#albumentations.augmentations.transforms.ElasticTransform)                 | ✓     | ✓     |        |           |
 | [Flip](https://albumentations.readthedocs.io/en/latest/api/augmentations.html#albumentations.augmentations.transforms.Flip)                                         | ✓     | ✓     | ✓      | ✓         |
 | [GridDistortion](https://albumentations.readthedocs.io/en/latest/api/augmentations.html#albumentations.augmentations.transforms.GridDistortion)                     | ✓     | ✓     |        |           |
@@ -166,23 +172,24 @@ Spatial-level transforms will simultaneously change both an input image as well 
 | [IAAPerspective](https://albumentations.readthedocs.io/en/latest/api/imgaug.html#albumentations.imgaug.transforms.IAAPerspective)                                   | ✓     | ✓     | ✓      | ✓         |
 | [IAAPiecewiseAffine](https://albumentations.readthedocs.io/en/latest/api/imgaug.html#albumentations.imgaug.transforms.IAAPiecewiseAffine)                           | ✓     | ✓     | ✓      | ✓         |
 | [Lambda](https://albumentations.readthedocs.io/en/latest/api/augmentations.html#albumentations.augmentations.transforms.Lambda)                                     | ✓     | ✓     | ✓      | ✓         |
-| [LongestMaxSize](https://albumentations.readthedocs.io/en/latest/api/augmentations.html#albumentations.augmentations.transforms.LongestMaxSize)                     | ✓     | ✓     | ✓      |           |
+| [LongestMaxSize](https://albumentations.readthedocs.io/en/latest/api/augmentations.html#albumentations.augmentations.transforms.LongestMaxSize)                     | ✓     | ✓     | ✓      | ✓         |
+| [MaskDropout](https://albumentations.readthedocs.io/en/latest/api/augmentations.html#albumentations.augmentations.transforms.MaskDropout)                           | ✓     | ✓     |        |           |
 | NoOp                                                                                                                                                                | ✓     | ✓     | ✓      | ✓         |
 | [OpticalDistortion](https://albumentations.readthedocs.io/en/latest/api/augmentations.html#albumentations.augmentations.transforms.OpticalDistortion)               | ✓     | ✓     |        |           |
 | [PadIfNeeded](https://albumentations.readthedocs.io/en/latest/api/augmentations.html#albumentations.augmentations.transforms.PadIfNeeded)                           | ✓     | ✓     | ✓      | ✓         |
 | [RandomCrop](https://albumentations.readthedocs.io/en/latest/api/augmentations.html#albumentations.augmentations.transforms.RandomCrop)                             | ✓     | ✓     | ✓      | ✓         |
-| [RandomCropNearBBox](https://albumentations.readthedocs.io/en/latest/api/augmentations.html#albumentations.augmentations.transforms.RandomCropNearBBox)             | ✓     | ✓     | ✓      |           |
+| [RandomCropNearBBox](https://albumentations.readthedocs.io/en/latest/api/augmentations.html#albumentations.augmentations.transforms.RandomCropNearBBox)             | ✓     | ✓     | ✓      | ✓         |
 | [RandomGridShuffle](https://albumentations.readthedocs.io/en/latest/api/augmentations.html#albumentations.augmentations.transforms.RandomGridShuffle)               | ✓     | ✓     |        |           |
 | [RandomResizedCrop](https://albumentations.readthedocs.io/en/latest/api/augmentations.html#albumentations.augmentations.transforms.RandomResizedCrop)               | ✓     | ✓     | ✓      | ✓         |
 | [RandomRotate90](https://albumentations.readthedocs.io/en/latest/api/augmentations.html#albumentations.augmentations.transforms.RandomRotate90)                     | ✓     | ✓     | ✓      | ✓         |
 | [RandomScale](https://albumentations.readthedocs.io/en/latest/api/augmentations.html#albumentations.augmentations.transforms.RandomScale)                           | ✓     | ✓     | ✓      | ✓         |
 | [RandomSizedBBoxSafeCrop](https://albumentations.readthedocs.io/en/latest/api/augmentations.html#albumentations.augmentations.transforms.RandomSizedBBoxSafeCrop)   | ✓     | ✓     | ✓      |           |
 | [RandomSizedCrop](https://albumentations.readthedocs.io/en/latest/api/augmentations.html#albumentations.augmentations.transforms.RandomSizedCrop)                   | ✓     | ✓     | ✓      | ✓         |
-| [Resize](https://albumentations.readthedocs.io/en/latest/api/augmentations.html#albumentations.augmentations.transforms.Resize)                                     | ✓     | ✓     | ✓      |           |
+| [Resize](https://albumentations.readthedocs.io/en/latest/api/augmentations.html#albumentations.augmentations.transforms.Resize)                                     | ✓     | ✓     | ✓      | ✓         |
 | [Rotate](https://albumentations.readthedocs.io/en/latest/api/augmentations.html#albumentations.augmentations.transforms.Rotate)                                     | ✓     | ✓     | ✓      | ✓         |
 | [ShiftScaleRotate](https://albumentations.readthedocs.io/en/latest/api/augmentations.html#albumentations.augmentations.transforms.ShiftScaleRotate)                 | ✓     | ✓     | ✓      | ✓         |
-| [SmallestMaxSize](https://albumentations.readthedocs.io/en/latest/api/augmentations.html#albumentations.augmentations.transforms.SmallestMaxSize)                   | ✓     | ✓     | ✓      |           |
-| [Transpose](https://albumentations.readthedocs.io/en/latest/api/augmentations.html#albumentations.augmentations.transforms.Transpose)                               | ✓     | ✓     | ✓      |           |
+| [SmallestMaxSize](https://albumentations.readthedocs.io/en/latest/api/augmentations.html#albumentations.augmentations.transforms.SmallestMaxSize)                   | ✓     | ✓     | ✓      | ✓         |
+| [Transpose](https://albumentations.readthedocs.io/en/latest/api/augmentations.html#albumentations.augmentations.transforms.Transpose)                               | ✓     | ✓     | ✓      | ✓         |
 | [VerticalFlip](https://albumentations.readthedocs.io/en/latest/api/augmentations.html#albumentations.augmentations.transforms.VerticalFlip)                         | ✓     | ✓     | ✓      | ✓         |
 
 ## Migrating from torchvision to albumentations
@@ -195,39 +202,41 @@ Albumentations has equivalents for common torchvision transforms as well as plen
 ## Benchmarking results
 To run the benchmark yourself follow the instructions in [benchmark/README.md](https://github.com/albu/albumentations/blob/master/benchmark/README.md)
 
-Results for running the benchmark on first 2000 images from the ImageNet validation set using an Intel Xeon Gold 6140 CPU.
+Results for running the benchmark on first 2000 images from the ImageNet validation set using an Intel Xeon Platinum 8168 CPU.
+All outputs are converted to a contiguous NumPy array with the np.uint8 data type.
 The table shows how many images per second can be processed on a single core, higher is better.
 
-|                    | albumentations <br><small>0.3.0</small> | imgaug <br><small>0.2.9</small> | torchvision (Pillow backend) <br><small>0.3.0</small> | torchvision (Pillow-SIMD backend) <br><small>0.3.0</small> | Keras <br><small>2.2.4</small> | Augmentor <br><small>0.2.3</small> | <br><small>solt 0.1.6</small> |
-|--------------------|:--------------------:|:------------:|:----------------------------------:|:---------------------------------------:|:-----------:|:---------------:|:----------:|
-| RandomCrop64       |        **271641**    |     3373     |                26538               |                  83251                  |      -      |      22535      |    21383   |
-| PadToSize512       |         **2818**     |       -      |                 414                |                   422                   |      -      |        -        |    2539    |
-| Resize512          |         **2168**     |      696     |                 296                |                   1046                  |      -      |       297       |    1907    |
-| HorizontalFlip     |          991         |      162     |                **4881**            |                   4595                  |     167     |       4595      |     166    |
-| VerticalFlip       |         **4244**     |     2278     |                3066                |                   3598                  |     4162    |       2985      |    3486    |
-| Rotate             |         **702**      |      475     |                 82                 |                   110                   |      7      |        37       |     239    |
-| ShiftScaleRotate   |         **1761**     |      761     |                 81                 |                   105                   |      9      |        -        |       -    |
-| Brightness         |          652         |     1520     |                 316                |                   408                   |     149     |       308       |    **2506**|
-| Contrast           |         1059         |     1539     |                 231                |                   316                   |      -      |       241       |    **2524**|
-| BrightnessContrast |          646         |      861     |                 128                |                   174                   |      -      |       130       |    **1305**|
-| ShiftHSV           |          168         |    **208**   |                 32                 |                    42                   |      -      |        -        |     107    |
-| ShiftRGB           |          555         |   **1521**   |                  -                 |                    -                    |     477     |        -        |      -     |
-| Gamma              |          483         |       -      |                 801                |                   **858**               |      -      |        -        |     447    |
-| Grayscale          |         **12097**    |      88      |                 728                |                   915                   |      -      |       2182      |    9140    |
+|                      |albumentations<br><small>0.4.2</small>|imgaug<br><small>0.3.0</small>|torchvision (Pillow-SIMD backend)<br><small>0.4.1</small>|keras<br><small>2.3.1</small>|augmentor<br><small>0.2.6</small>|solt<br><small>0.1.8</small>|
+|----------------------|:------------------------------------:|:----------------------------:|:-------------------------------------------------------:|:---------------------------:|:-------------------------------:|:--------------------------:|
+|HorizontalFlip        |               **2183**               |             1403             |                          1757                           |            1068             |              1779               |            1031            |
+|VerticalFlip          |               **4217**               |             2334             |                          1538                           |            4196             |              1541               |            3820            |
+|Rotate                |               **456**                |             368              |                           163                           |             32              |               60                |            116             |
+|ShiftScaleRotate      |               **800**                |             549              |                           146                           |             34              |                -                |             -              |
+|Brightness            |               **2209**               |             1288             |                           405                           |             211             |               403               |            2070            |
+|Contrast              |               **2215**               |             1387             |                           338                           |              -              |               337               |            2073            |
+|BrightnessContrast    |               **2208**               |             740              |                           193                           |              -              |               193               |            1060            |
+|ShiftRGB              |               **2214**               |             1303             |                            -                            |             407             |                -                |             -              |
+|ShiftHSV              |               **468**                |             443              |                           61                            |              -              |                -                |            144             |
+|Gamma                 |               **2281**               |              -               |                           730                           |              -              |                -                |            925             |
+|Grayscale             |               **5019**               |             436              |                           788                           |              -              |              1451               |            4191            |
+|RandomCrop64          |              **173877**              |             3340             |                          43792                          |              -              |              36869              |           36178            |
+|PadToSize512          |               **2906**               |              -               |                           553                           |              -              |                -                |            2711            |
+|Resize512             |                 663                  |             506              |                         **968**                         |              -              |               954               |            673             |
+|RandomSizedCrop_64_512|               **2565**               |             933              |                          1395                           |              -              |              1353               |            2360            |
+|Equalize              |               **759**                |             457              |                            -                            |              -              |               684               |             -              |
 
-Python and library versions: Python 3.7.3 | Anaconda, numpy 1.16.4, pillow 6.0.0, pillow-simd 5.3.0.post1, opencv-python 4.1.0.25, scikit-image 0.15.0, scipy 1.3.0.
-
+Python and library versions: Python 3.7.5 (default, Oct 19 2019, 00:03:48) \[GCC 8.3.0\], numpy 1.17.3, pillow-simd 6.0.0.post0, opencv-python 4.1.1.26, scikit-image 0.16.2, scipy 1.3.1.
 
 ## Contributing
 
-To create pull request to the repository follow the documentation at [docs/contributing.rst](docs/contributing.rst)
+To create a pull request to the repository follow the documentation at [docs/contributing.rst](docs/contributing.rst)
 
 ### Adding new transforms
 If you are contributing a new transformation, make sure to update ["Pixel-level transforms"](#pixel-level-transforms) or/and ["Spatial-level transforms"](#spatial-level-transforms) sections of this file (`README.md`). To do this, simply run (with python3 only):
 ```
 python3 tools/make_transforms_docs.py make
 ```
-and copy/paste the results in the corresponding sections. To validate your modifications, you
+and copy/paste the results into the corresponding sections. To validate your modifications, you
 can run:
 ```
 python3 tools/make_transforms_docs.py check README.md
@@ -252,11 +261,15 @@ python3 tools/make_transforms_docs.py check README.md
 Alternatively, you can start a web server that rebuilds the documentation
 automatically when a change is detected by running `make livehtml`
 
-## Hall of fame
+## Competitions won with the library
 Albumentations are widely used in Computer Vision Competitions at Kaggle an other platforms.
 
 You can find their names and links to the solutions [here](docs/hall_of_fame.rst).
 
+## Used by
+<a href="https://www.lyft.com/" target="_blank"><img src="https://habrastorage.org/webt/ce/bs/sa/cebssajf_5asst5yshmyykqjhcg.png" width="100"/></a>
+<a href="https://www.x5.ru/en" target="_blank"><img src="https://habrastorage.org/webt/9y/dv/f1/9ydvf1fbxotkl6nyhydrn9v8cqw.png" width="100"/></a>
+<a href="https://imedhub.org/" target="_blank"><img src="https://habrastorage.org/webt/eq/8x/m-/eq8xm-fjfx_uqkka4_ekxsdwtiq.png" width="100"/></a>
 
 ## Comments
 In some systems, in the multiple GPU regime PyTorch may deadlock the DataLoader if OpenCV was compiled with OpenCL optimizations. Adding the following two lines before the library import may help. For more details [https://github.com/pytorch/pytorch/issues/1355](https://github.com/pytorch/pytorch/issues/1355)
@@ -279,3 +292,5 @@ If you find this library useful for your research, please consider citing:
       year = 2018
 }
 ```
+
+You can find the full list of papers that cite Albumentations [here](docs/citations.rst).

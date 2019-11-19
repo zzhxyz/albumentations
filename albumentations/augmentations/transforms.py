@@ -5,6 +5,7 @@ import random
 import warnings
 from enum import Enum
 from types import LambdaType
+from skimage.measure import label
 
 import cv2
 import numpy as np
@@ -44,6 +45,7 @@ __all__ = [
     "ChannelShuffle",
     "InvertImg",
     "ToGray",
+    "ToSepia",
     "JpegCompression",
     "ImageCompression",
     "Cutout",
@@ -73,6 +75,8 @@ __all__ = [
     "Equalize",
     "Posterize",
     "Downscale",
+    "MultiplicativeNoise",
+    "MaskDropout",
 ]
 
 
@@ -150,12 +154,12 @@ class PadIfNeeded(DualTransform):
 
     def apply_to_bbox(self, bbox, pad_top=0, pad_bottom=0, pad_left=0, pad_right=0, rows=0, cols=0, **params):
         x_min, y_min, x_max, y_max = denormalize_bbox(bbox, rows, cols)
-        bbox = [x_min + pad_left, y_min + pad_top, x_max + pad_left, y_max + pad_top]
+        bbox = x_min + pad_left, y_min + pad_top, x_max + pad_left, y_max + pad_top
         return normalize_bbox(bbox, rows + pad_top + pad_bottom, cols + pad_left + pad_right)
 
     def apply_to_keypoint(self, keypoint, pad_top=0, pad_bottom=0, pad_left=0, pad_right=0, **params):
-        x, y, a, s = keypoint
-        return [x + pad_left, y + pad_top, a, s]
+        x, y, angle, scale = keypoint
+        return x + pad_left, y + pad_top, angle, scale
 
     def get_transform_init_args_names(self):
         return ("min_height", "min_width", "border_mode", "value", "mask_value")
@@ -165,13 +169,13 @@ class Crop(DualTransform):
     """Crop region from image.
 
     Args:
-        x_min (int): minimum upper left x coordinate.
-        y_min (int): minimum upper left y coordinate.
-        x_max (int): maximum lower right x coordinate.
-        y_max (int): maximum lower right y coordinate.
+        x_min (int): Minimum upper left x coordinate.
+        y_min (int): Minimum upper left y coordinate.
+        x_max (int): Maximum lower right x coordinate.
+        y_max (int): Maximum lower right y coordinate.
 
     Targets:
-        image, mask, bboxes
+        image, mask, bboxes, keypoints
 
     Image types:
         uint8, float32
@@ -189,6 +193,16 @@ class Crop(DualTransform):
 
     def apply_to_bbox(self, bbox, **params):
         return F.bbox_crop(bbox, x_min=self.x_min, y_min=self.y_min, x_max=self.x_max, y_max=self.y_max, **params)
+
+    def apply_to_keypoint(self, keypoint, **params):
+        return F.crop_keypoint_by_coords(
+            keypoint,
+            crop_coords=(self.x_min, self.y_min, self.x_max, self.y_max),
+            crop_height=self.y_max - self.y_min,
+            crop_width=self.x_max - self.x_min,
+            rows=params["rows"],
+            cols=params["cols"],
+        )
 
     def get_transform_init_args_names(self):
         return ("x_min", "y_min", "x_max", "y_max")
@@ -293,7 +307,7 @@ class Transpose(DualTransform):
         p (float): probability of applying the transform. Default: 0.5.
 
     Targets:
-        image, mask, bboxes
+        image, mask, bboxes, keypoints
 
     Image types:
         uint8, float32
@@ -304,6 +318,9 @@ class Transpose(DualTransform):
 
     def apply_to_bbox(self, bbox, **params):
         return F.bbox_transpose(bbox, 0, **params)
+
+    def apply_to_keypoint(self, keypoint, **params):
+        return F.keypoint_transpose(keypoint)
 
     def get_transform_init_args_names(self):
         return ()
@@ -318,7 +335,7 @@ class LongestMaxSize(DualTransform):
         p (float): probability of applying the transform. Default: 1.
 
     Targets:
-        image, mask, bboxes
+        image, mask, bboxes, keypoints
 
     Image types:
         uint8, float32
@@ -336,6 +353,13 @@ class LongestMaxSize(DualTransform):
         # Bounding box coordinates are scale invariant
         return bbox
 
+    def apply_to_keypoint(self, keypoint, **params):
+        height = params["rows"]
+        width = params["cols"]
+
+        scale = self.max_size / max([height, width])
+        return F.keypoint_scale(keypoint, scale, scale)
+
     def get_transform_init_args_names(self):
         return ("max_size", "interpolation")
 
@@ -349,7 +373,7 @@ class SmallestMaxSize(DualTransform):
         p (float): probability of applying the transform. Default: 1.
 
     Targets:
-        image, mask, bboxes
+        image, mask, bboxes, keypoints
 
     Image types:
         uint8, float32
@@ -365,6 +389,13 @@ class SmallestMaxSize(DualTransform):
 
     def apply_to_bbox(self, bbox, **params):
         return bbox
+
+    def apply_to_keypoint(self, keypoint, **params):
+        height = params["rows"]
+        width = params["cols"]
+
+        scale = self.max_size / min([height, width])
+        return F.keypoint_scale(keypoint, scale, scale)
 
     def get_transform_init_args_names(self):
         return ("max_size", "interpolation")
@@ -382,7 +413,7 @@ class Resize(DualTransform):
         p (float): probability of applying the transform. Default: 1.
 
     Targets:
-        image, mask, bboxes
+        image, mask, bboxes, keypoints
 
     Image types:
         uint8, float32
@@ -400,6 +431,13 @@ class Resize(DualTransform):
     def apply_to_bbox(self, bbox, **params):
         # Bounding box coordinates are scale invariant
         return bbox
+
+    def apply_to_keypoint(self, keypoint, **params):
+        height = params["rows"]
+        width = params["cols"]
+        scale_x = self.width / width
+        scale_y = self.height / height
+        return F.keypoint_scale(keypoint, scale_x, scale_y)
 
     def get_transform_init_args_names(self):
         return ("height", "width", "interpolation")
@@ -707,7 +745,7 @@ class RandomCropNearBBox(DualTransform):
         p (float): probability of applying the transform. Default: 1.
 
     Targets:
-        image
+        image, mask, bboxes, keypoints
 
     Image types:
         uint8, float32
@@ -737,6 +775,16 @@ class RandomCropNearBBox(DualTransform):
         h_start = y_min
         w_start = x_min
         return F.bbox_crop(bbox, y_max - y_min, x_max - x_min, h_start, w_start, **params)
+
+    def apply_to_keypoint(self, keypoint, x_min=0, x_max=0, y_min=0, y_max=0, **params):
+        return F.crop_keypoint_by_coords(
+            keypoint,
+            crop_coords=(x_min, y_min, x_max, y_max),
+            crop_height=y_max - y_min,
+            crop_width=x_max - x_min,
+            rows=params["rows"],
+            cols=params["cols"],
+        )
 
     @property
     def targets_as_params(self):
@@ -980,7 +1028,7 @@ class CropNonEmptyMaskIfExists(DualTransform):
         p (float): probability of applying the transform. Default: 1.0.
 
     Targets:
-        image, mask
+        image, mask, bboxes, keypoints
 
     Image types:
         uint8, float32
@@ -1001,6 +1049,21 @@ class CropNonEmptyMaskIfExists(DualTransform):
 
     def apply(self, img, x_min=0, x_max=0, y_min=0, y_max=0, **params):
         return F.crop(img, x_min, y_min, x_max, y_max)
+
+    def apply_to_bbox(self, bbox, x_min=0, x_max=0, y_min=0, y_max=0, **params):
+        return F.bbox_crop(
+            bbox, x_min=x_min, x_max=x_max, y_min=y_min, y_max=y_max, rows=params["rows"], cols=params["cols"]
+        )
+
+    def apply_to_keypoint(self, keypoint, x_min=0, x_max=0, y_min=0, y_max=0, **params):
+        return F.crop_keypoint_by_coords(
+            keypoint,
+            crop_coords=[x_min, y_min, x_max, y_max],
+            crop_height=y_max - y_min,
+            crop_width=x_max - x_min,
+            rows=params["rows"],
+            cols=params["cols"],
+        )
 
     @property
     def targets_as_params(self):
@@ -1270,7 +1333,7 @@ class RandomGridShuffle(DualTransform):
         uint8, float32
     """
 
-    def __init__(self, grid=(3, 3), always_apply=False, p=1.0):
+    def __init__(self, grid=(3, 3), always_apply=False, p=0.5):
         super(RandomGridShuffle, self).__init__(always_apply, p)
         self.grid = grid
 
@@ -1491,9 +1554,9 @@ class CoarseDropout(ImageOnlyTransform):
         height, width = img.shape[:2]
 
         holes = []
-        for _n in range(random.randint(self.min_holes, self.max_holes + 1)):
-            hole_height = random.randint(self.min_height, self.max_height + 1)
-            hole_width = random.randint(self.min_width, self.max_width + 1)
+        for _n in range(random.randint(self.min_holes, self.max_holes)):
+            hole_height = random.randint(self.min_height, self.max_height)
+            hole_width = random.randint(self.min_width, self.max_width)
 
             y1 = random.randint(0, height - hole_height)
             x1 = random.randint(0, width - hole_width)
@@ -1761,7 +1824,7 @@ class RandomFog(ImageOnlyTransform):
     Args:
         fog_coef_lower (float): lower limit for fog intensity coefficient. Should be in [0, 1] range.
         fog_coef_upper (float): upper limit for fog intensity coefficient. Should be in [0, 1] range.
-        alpha_coef (float): transparence of the fog circles. Should be in [0, 1] range.
+        alpha_coef (float): transparency of the fog circles. Should be in [0, 1] range.
 
     Targets:
         image
@@ -2237,17 +2300,11 @@ class RandomBrightnessContrast(ImageOnlyTransform):
         uint8, float32
     """
 
-    def __init__(self, brightness_limit=0.2, contrast_limit=0.2, brightness_by_max=None, always_apply=False, p=0.5):
+    def __init__(self, brightness_limit=0.2, contrast_limit=0.2, brightness_by_max=True, always_apply=False, p=0.5):
         super(RandomBrightnessContrast, self).__init__(always_apply, p)
         self.brightness_limit = to_tuple(brightness_limit)
         self.contrast_limit = to_tuple(contrast_limit)
         self.brightness_by_max = brightness_by_max
-
-        if brightness_by_max is None:
-            DeprecationWarning(
-                "In the version 0.4.0 default behavior of RandomBrightnessContrast "
-                "brightness_by_max will be changed to True."
-            )
 
     def apply(self, img, alpha=1.0, beta=0.0, **params):
         return F.brightness_contrast_adjust(img, alpha, beta, self.brightness_by_max)
@@ -2333,7 +2390,7 @@ class Blur(ImageOnlyTransform):
         return F.blur(image, ksize)
 
     def get_params(self):
-        return {"ksize": random.choice(np.arange(self.blur_limit[0], self.blur_limit[1] + 1, 2))}
+        return {"ksize": int(random.choice(np.arange(self.blur_limit[0], self.blur_limit[1] + 1, 2)))}
 
     def get_transform_init_args_names(self):
         return ("blur_limit",)
@@ -2367,6 +2424,9 @@ class MotionBlur(Blur):
         else:
             ys, ye = random.randint(0, ksize - 1), random.randint(0, ksize - 1)
         cv2.line(kernel, (xs, ys), (xe, ye), 1, thickness=1)
+
+        # Normalize kernel
+        kernel = kernel.astype(np.float32) / np.sum(kernel)
         return {"kernel": kernel}
 
 
@@ -2430,7 +2490,7 @@ class GaussNoise(ImageOnlyTransform):
         uint8, float32
     """
 
-    def __init__(self, var_limit=(10.0, 50.0), mean=None, always_apply=False, p=0.5):
+    def __init__(self, var_limit=(10.0, 50.0), mean=0, always_apply=False, p=0.5):
         super(GaussNoise, self).__init__(always_apply, p)
         if isinstance(var_limit, tuple):
             if var_limit[0] < 0:
@@ -2454,10 +2514,6 @@ class GaussNoise(ImageOnlyTransform):
         var = random.uniform(self.var_limit[0], self.var_limit[1])
         sigma = var ** 0.5
         random_state = np.random.RandomState(random.randint(0, 2 ** 32 - 1))
-
-        if self.mean is None:
-            DeprecationWarning("In the version 0.4.0 default behavior of GaussNoise mean will be changed to 0.")
-            self.mean = var
 
         gauss = random_state.normal(self.mean, sigma, image.shape)
         return {"gauss": gauss}
@@ -2693,6 +2749,32 @@ class ToGray(ImageOnlyTransform):
         return ()
 
 
+class ToSepia(ImageOnlyTransform):
+    """Applies sepia filter to the input RGB image
+
+    Args:
+        p (float): probability of applying the transform. Default: 0.5.
+
+    Targets:
+        image
+
+    Image types:
+        uint8, float32
+    """
+
+    def __init__(self, always_apply=False, p=0.5):
+        super(ToSepia, self).__init__(always_apply, p)
+        self.sepia_transformation_matrix = np.matrix(
+            [[0.393, 0.769, 0.189], [0.349, 0.686, 0.168], [0.272, 0.534, 0.131]]
+        )
+
+    def apply(self, image, **params):
+        return F.linear_transformation_rgb(image, self.sepia_transformation_matrix)
+
+    def get_transform_init_args_names(self):
+        return ()
+
+
 class ToFloat(ImageOnlyTransform):
     """Divide pixel values by `max_value` to get a float32 output array where all values lie in the range [0, 1.0].
     If `max_value` is None the transform will try to infer the maximum value by inspecting the data type of the input
@@ -2858,3 +2940,145 @@ class Lambda(NoOp):
         state.update(self.custom_apply_fns.items())
         state.update(self.get_base_init_args())
         return "{name}({args})".format(name=self.__class__.__name__, args=format_args(state))
+
+
+class MultiplicativeNoise(ImageOnlyTransform):
+    """Multiply image to random number or array of numbers.
+
+    Args:
+        multiplier (float or tuple of floats): If single float image will be multiplied to this number.
+            If tuple of float multiplier will be in range `[multiplier[0], multiplier[1])`. Default: (0.9, 1.1).
+        per_channel (bool): If `False`, same values for all channels will be used.
+            If `True` use sample values for each channels. Default False.
+        elementwise (bool): If `False` multiply multiply all pixels in an image with a random value sampled once.
+            If `True` Multiply image pixels with values that are pixelwise randomly sampled. Defaule: False.
+
+    Targets:
+        image
+
+    Image types:
+        Any
+    """
+
+    def __init__(self, multiplier=(0.9, 1.1), per_channel=False, elementwise=False, always_apply=False, p=0.5):
+        super(MultiplicativeNoise, self).__init__(always_apply, p)
+        self.multiplier = to_tuple(multiplier, multiplier)
+        self.per_channel = per_channel
+        self.elementwise = elementwise
+
+    def apply(self, img, multiplier=np.array([1]), **kwargs):
+        return F.multiply(img, multiplier)
+
+    def get_params_dependent_on_targets(self, params):
+        if self.multiplier[0] == self.multiplier[1]:
+            return {"multiplier": np.array([self.multiplier[0]])}
+
+        img = params["image"]
+
+        h, w = img.shape[:2]
+
+        if self.per_channel:
+            c = 1 if F.is_grayscale_image(img) else img.shape[-1]
+        else:
+            c = 1
+
+        if self.elementwise:
+            shape = [h, w, c]
+        else:
+            shape = [c]
+
+        multiplier = np.random.uniform(self.multiplier[0], self.multiplier[1], shape)
+        if F.is_grayscale_image(img):
+            multiplier = np.squeeze(multiplier)
+
+        return {"multiplier": multiplier}
+
+    @property
+    def targets_as_params(self):
+        return ["image"]
+
+    def get_transform_init_args_names(self):
+        return "multiplier", "per_channel", "elementwise"
+
+
+class MaskDropout(DualTransform):
+    """
+    Image & mask augmentation that zero out mask and image regions corresponding
+    to randomly chosen object instance from mask.
+
+    Mask must be single-channel image, zero values treated as background.
+    Image can be any number of channels.
+
+    Inspired by https://www.kaggle.com/c/severstal-steel-defect-detection/discussion/114254
+    """
+
+    def __init__(self, max_objects=1, image_fill_value=0, mask_fill_value=0, always_apply=False, p=0.5):
+        """
+        Args:
+            max_objects: Maximum number of labels that can be zeroed out. Can be tuple, in this case it's [min, max]
+            image_fill_value: Fill value to use when filling image.
+                Can be 'inpaint' to apply inpaining (works only  for 3-chahnel images)
+            mask_fill_value: Fill value to use when filling mask.
+
+        Targets:
+            image, mask
+
+        Image types:
+            uint8, float32
+        """
+        super(MaskDropout, self).__init__(always_apply, p)
+        self.max_objects = to_tuple(max_objects, 1)
+        self.image_fill_value = image_fill_value
+        self.mask_fill_value = mask_fill_value
+
+    @property
+    def targets_as_params(self):
+        return ["mask"]
+
+    def get_params_dependent_on_targets(self, params):
+        mask = params["mask"]
+
+        label_image, num_labels = label(mask, return_num=True)
+
+        if num_labels == 0:
+            dropout_mask = None
+        else:
+            objects_to_drop = random.randint(self.max_objects[0], self.max_objects[1])
+            objects_to_drop = min(num_labels, objects_to_drop)
+
+            if objects_to_drop == num_labels:
+                dropout_mask = mask > 0
+            else:
+                labels_index = random.sample(range(1, num_labels + 1), objects_to_drop)
+                dropout_mask = np.zeros((mask.shape[0], mask.shape[1]), dtype=np.bool)
+                for label_index in labels_index:
+                    dropout_mask |= label_image == label_index
+
+        params.update({"dropout_mask": dropout_mask})
+        return params
+
+    def apply(self, img, dropout_mask=None, **params):
+        if dropout_mask is None:
+            return img
+
+        if self.image_fill_value == "inpaint":
+            dropout_mask = dropout_mask.astype(np.uint8)
+            _, _, w, h = cv2.boundingRect(dropout_mask)
+            radius = min(3, max(w, h) // 2)
+            img = cv2.inpaint(img, dropout_mask, radius, cv2.INPAINT_NS)
+        else:
+            img = img.copy()
+            img[dropout_mask] = self.image_fill_value
+
+        return img
+
+    def apply_to_mask(self, img, dropout_mask=None, **params):
+        if dropout_mask is None:
+            return img
+
+        img = img.copy()
+        img[dropout_mask] = self.mask_fill_value
+        return img
+
+    def get_transform_init_args_names(self):
+        return ("max_objects", "image_fill_value", "mask_fill_value")
