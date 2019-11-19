@@ -245,7 +245,6 @@ class HorizontalFlip(DualTransform):
 
     Image types:
         uint8, float32
-
     """
 
     def apply(self, img, **params):
