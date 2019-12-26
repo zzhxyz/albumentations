@@ -369,6 +369,7 @@ def test_augmentations_wont_change_float_input(augmentation_cls, params, float_i
         [Posterize, {}],
         [Equalize, {}],
         [MultiplicativeNoise, {}],
+        [HueSaturationValue, {}],
     ],
 )
 def test_augmentations_wont_change_shape_grayscale(augmentation_cls, params, image, mask):
