@@ -8,11 +8,11 @@ environment:
 
   matrix:
     - PYTHON: 'C:\Python35-x64'
-      PYTORCH_WHEEL: 'https://download.pytorch.org/whl/cpu/torch-1.0.1-cp35-cp35m-win_amd64.whl'
+      PYTORCH_WHEEL: 'https://download.pytorch.org/whl/cpu/torch-1.4.0%2Bcpu-cp35-cp35m-win_amd64.whl'
     - PYTHON: 'C:\Python36-x64'
-      PYTORCH_WHEEL: 'https://download.pytorch.org/whl/cpu/torch-1.0.1-cp36-cp36m-win_amd64.whl'
+      PYTORCH_WHEEL: 'https://download.pytorch.org/whl/cpu/torch-1.4.0%2Bcpu-cp36-cp36m-win_amd64.whl'
     - PYTHON: 'C:\Python37-x64'
-      PYTORCH_WHEEL: 'https://download.pytorch.org/whl/cpu/torch-1.0.1-cp37-cp37m-win_amd64.whl'
+      PYTORCH_WHEEL: 'https://download.pytorch.org/whl/cpu/torch-1.4.0%2Bcpu-cp37-cp37m-win_amd64.whl'
 
 install:
   - '%PYTHON%\python.exe -m pip install -U pip wheel setuptools'

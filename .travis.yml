@@ -20,7 +20,7 @@ matrix:
     - python: 3.6
       env: PYTORCH_WHEEL=https://download.pytorch.org/whl/cpu/torch-1.4.0%2Bcpu-cp36-cp36m-linux_x86_64.whl
     - python: 3.7
-      env: PYTORCH_WHEEL=https://download.pytorch.org/whl/cpu/torch-1.4.0%2Bcpu-cp357-cp37m-linux_x86_64.whl
+      env: PYTORCH_WHEEL=https://download.pytorch.org/whl/cpu/torch-1.4.0%2Bcpu-cp37-cp37m-linux_x86_64.whl
       dist: xenial
       sudo: true
     - python: 3.7
