@@ -380,6 +380,7 @@ def test_augmentations_wont_change_float_input(augmentation_cls, params, float_i
     ],
 )
 def test_augmentations_wont_change_shape_grayscale(augmentation_cls, params, image, mask):
+    1 // 0
     aug = augmentation_cls(p=1, **params)
 
     # Test for grayscale image
