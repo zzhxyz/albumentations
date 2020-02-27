@@ -7,7 +7,6 @@ import torch
 from torchvision.transforms import functional as F
 
 from ..core.transforms_interface import BasicTransform
-from ..augmentations.functional import is_grayscale_image
 
 
 __all__ = ["ToTensor", "ToTensorV2", "BasicTransformTorch"]
@@ -81,11 +80,17 @@ class ToTensor(BasicTransform):
 
 
 class ToTensorV2(BasicTransform):
-    """Convert image and mask to `torch.Tensor`."""
+    """Convert image and mask to `torch.Tensor`.
 
-    def __init__(self, always_apply=True, device="cpu", p=1.0):
+            Args:
+                device: Move tensor to selected device. Default: "CPU"
+                mask_as_image:  If True, work mask like image. Default False.
+            """
+
+    def __init__(self, always_apply=True, device="cpu", p=1.0, mask_as_image=False):
         super(ToTensorV2, self).__init__(always_apply=always_apply, p=p)
         self.device = device
+        self.mask_as_image = mask_as_image
 
     @property
     def targets(self):
@@ -98,10 +103,13 @@ class ToTensorV2(BasicTransform):
         return torch.from_numpy(img.transpose(2, 0, 1)).to(self.device)
 
     def apply_to_mask(self, mask, **params):
+        if self.mask_as_image:
+            return self.apply(mask, **params)
+
         return torch.from_numpy(mask).to(self.device)
 
     def get_transform_init_args_names(self):
-        return ("device",)
+        return ("device", "mask_as_image")
 
     def get_params_dependent_on_targets(self, params):
         return {}
