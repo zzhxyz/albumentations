@@ -13,7 +13,7 @@ from albumentations.core.utils import format_args, Params
 from albumentations.augmentations.bbox_utils import BboxProcessor
 from albumentations.core.serialization import SERIALIZABLE_REGISTRY, instantiate_lambda
 
-__all__ = ["Compose", "OneOf", "OneOrOther", "BboxParams", "KeypointParams", "ReplayCompose"]
+__all__ = ["Compose", "ComposeBatch", "OneOf", "OneOrOther", "BboxParams", "KeypointParams", "ReplayCompose"]
 
 
 REPR_INDENT_STEP = 2
@@ -118,7 +118,7 @@ class BaseCompose(object):
 
 
 class Compose(BaseCompose):
-    """Compose transforms and handle all transformations regrading bounding boxes
+    """Compose transforms and handle all transformations regarding bounding boxes
 
     Args:
         transforms (list): list of transformations to compose.
@@ -193,6 +193,65 @@ class Compose(BaseCompose):
             }
         )
         return dictionary
+
+
+class ComposeBatch(Compose):
+    """This transforms works only with batched data.
+    You can use batched additional targets to, but transfer them with postfix `_batch`, like `target_batch`.
+
+    Returns all batches as lists, like: `{"image_batch": [image1, image2]}`
+
+    """
+
+    def __call__(self, force_apply=False, **data):
+        assert isinstance(force_apply, (bool, int)), "force_apply must have bool or int type"
+        need_to_run = force_apply or random.random() < self.p
+        transforms = self.transforms if need_to_run else self.transforms.get_always_apply(self.transforms)
+        dual_start_end = transforms.start_end if self.processors else None
+
+        batch_len = None
+        batches = {}
+        new_data = {}
+        for key, item in data.items():
+            if not key.endswith("_batch"):
+                new_data[key] = item
+                continue
+
+            new_key = key[: -len("_batch")]
+            batches[new_key] = [i for i in item]
+            if batch_len is None:
+                batch_len = len(item)
+            elif batch_len != len(item):
+                raise RuntimeError("Different elements count in batches: {} and {}".format(batch_len, len(item)))
+
+        for idx, t in enumerate(transforms):
+            for i in range(batch_len):
+                for key, item in batches.items():
+                    new_data[key] = item[i]
+
+                for p in self.processors.values():
+                    p.ensure_data_valid(new_data)
+
+                if dual_start_end is not None and idx == dual_start_end[0]:
+                    for p in self.processors.values():
+                        p.preprocess(new_data)
+
+                new_data = t(force_apply=force_apply, **new_data)
+
+                if dual_start_end is not None and idx == dual_start_end[1]:
+                    for p in self.processors.values():
+                        p.postprocess(new_data)
+
+                for key, item in batches.items():
+                    item[i] = new_data[key]
+
+        for key in data.keys():
+            if key in new_data:
+                data[key] = new_data[key]
+        for key, batch in batches.items():
+            data[key + "_batch"] = batch
+
+        return data
 
 
 class OneOf(BaseCompose):
